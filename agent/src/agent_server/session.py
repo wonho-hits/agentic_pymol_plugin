@@ -9,7 +9,7 @@ them as ndjson messages.
 from __future__ import annotations
 
 import traceback
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -59,6 +59,26 @@ def _tool_calls_of(msg: Any) -> list[dict]:
         else:
             out.append({"name": getattr(c, "name", "?"), "args": getattr(c, "args", {})})
     return out
+
+
+def _unwrap_messages(value: Any) -> list:
+    """Coerce a state-channel value into a plain list of messages.
+
+    A node may return ``langgraph.types.Overwrite(value=[...])`` to bypass
+    the reducer; that wrapper isn't iterable on its own.
+    """
+    if value is None:
+        return []
+    if hasattr(value, "value") and not isinstance(value, (list, tuple, dict, str)):
+        value = value.value
+    if isinstance(value, (list, tuple)):
+        return list(value)
+    if isinstance(value, dict):
+        return [value]
+    try:
+        return list(value)
+    except TypeError:
+        return []
 
 
 def _short(text: str, limit: int = _MAX_EVENT_LEN) -> str:
@@ -129,8 +149,7 @@ class AgentRunner:
         for node_name, update in chunk.items():
             if not isinstance(update, dict):
                 continue
-            msgs: Iterable = update.get("messages") or []
-            for m in msgs:
+            for m in _unwrap_messages(update.get("messages")):
                 self._render_message(node_name, m)
 
     def _render_message(self, node: str, msg: Any) -> None:
@@ -173,7 +192,7 @@ class AgentRunner:
         for update in final_state.values():
             if not isinstance(update, dict):
                 continue
-            for m in update.get("messages") or []:
+            for m in _unwrap_messages(update.get("messages")):
                 role = m.get("type") if isinstance(m, dict) else getattr(m, "type", None)
                 if role == "ai":
                     t = _text_of(m)
