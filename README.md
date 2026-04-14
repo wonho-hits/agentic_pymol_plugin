@@ -122,7 +122,7 @@ Open `.env.local` in your editor and replace `your_gemini_api_key_here` with
 your actual key:
 
 ```dotenv
-GOOGLE_API_KEY=AIzaSy...your_key_here...
+GOOGLE_API_KEY=your_key_here
 ```
 
 ### 5. Install the plugin into PyMOL
