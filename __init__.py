@@ -48,7 +48,7 @@ def _ensure_client() -> AgentClient:
     return _CLIENT
 
 
-def ask(*args) -> None:
+def ask(*args, **_kwargs) -> None:
     """PyMOL command: ``ask <natural-language request>``."""
     message = " ".join(str(a) for a in args).strip()
     if not message:
@@ -68,7 +68,7 @@ def ask(*args) -> None:
     client.ask(message)
 
 
-def ask_reset() -> None:
+def ask_reset(*_args, **_kwargs) -> None:
     """PyMOL command: clear conversation memory (restarts the subprocess)."""
     global _CLIENT
     if _CLIENT is None:
@@ -83,7 +83,7 @@ def ask_reset() -> None:
     print(f"[agent] memory cleared — new thread={_CLIENT.thread_id[:8]}")
 
 
-def ask_status() -> None:
+def ask_status(*_args, **_kwargs) -> None:
     """PyMOL command: show whether the agent is currently running."""
     if _CLIENT is None:
         print("[agent] not initialized (run `ask <...>` to start)")
@@ -92,7 +92,7 @@ def ask_status() -> None:
     print(f"[agent] {state}  thread={_CLIENT.thread_id[:8]}")
 
 
-def ask_cancel() -> None:
+def ask_cancel(*_args, **_kwargs) -> None:
     """PyMOL command: cancel the currently running request."""
     if _CLIENT is None or not _CLIENT.is_running:
         print("[agent] nothing to cancel")
