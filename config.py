@@ -38,7 +38,10 @@ def load_config() -> dict:
 
     override = os.environ.get("AGENTIC_PYMOL_AGENT_PYTHON")
     if override:
-        agent_python = Path(override).expanduser().resolve()
+        # Keep the symlink — invoking `agent/.venv/bin/python` via its real
+        # uv-managed target skips venv activation (no pyvenv.cfg next to it)
+        # and the subprocess ends up without langchain/deepagents on sys.path.
+        agent_python = Path(override).expanduser().absolute()
     else:
         from plugin_side.agent_client import resolve_agent_python
 
@@ -46,7 +49,7 @@ def load_config() -> dict:
 
     agent_dir_override = os.environ.get("AGENTIC_PYMOL_AGENT_DIR")
     if agent_dir_override:
-        agent_dir = Path(agent_dir_override).expanduser().resolve()
+        agent_dir = Path(agent_dir_override).expanduser().absolute()
     elif override:
         # `<agent_dir>/.venv/bin/python` → walk up to the agent project root.
         agent_dir = agent_python.parent.parent.parent
