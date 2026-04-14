@@ -145,15 +145,21 @@ In PyMOL:
 
 - Select `dist/agentic_pymol_plugin.zip`.
 - PyMOL extracts it into `~/.pymol/startup/agentic_pymol_plugin/`.
-- The zip does **not** include `.env.local` or the `agent/.venv/`. Wire them
-  up after install:
+- The zip does **not** include `.env.local` or the `agent/` project. Wire
+  them up after install:
   ```bash
   cp .env.local ~/.pymol/startup/agentic_pymol_plugin/.env.local
   ```
-  Then point the plugin at the agent environment with one of:
-  - Set `AGENTIC_PYMOL_AGENT_PYTHON=/absolute/path/to/agent/.venv/bin/python`
-    in `.env.local`, **or**
-  - Symlink the agent project next to the installed plugin:
+  Then point the plugin at the agent project with one of:
+  - Set absolute paths in `.env.local`:
+    ```dotenv
+    AGENTIC_PYMOL_AGENT_PYTHON=/absolute/path/to/agent/.venv/bin/python
+    AGENTIC_PYMOL_AGENT_DIR=/absolute/path/to/agent
+    ```
+    Setting `AGENTIC_PYMOL_AGENT_PYTHON` alone is enough — the plugin
+    derives the agent directory from it. Set `AGENTIC_PYMOL_AGENT_DIR`
+    explicitly if your layout doesn't follow `agent/.venv/bin/python`.
+  - Or symlink the agent project next to the installed plugin:
     ```bash
     ln -s ~/Projects/agentic_pymol_plugin/agent \
           ~/.pymol/startup/agentic_pymol_plugin/agent
@@ -234,7 +240,8 @@ Tune behaviour through `.env.local`:
 | `AGENTIC_PYMOL_MODEL`         | `gemini-2.5-flash`  | Model to use. Try `gemini-2.5-pro` for harder tasks.    |
 | `AGENTIC_PYMOL_RECURSION`     | `50`                | LangGraph recursion limit.                              |
 | `AGENTIC_PYMOL_TIMEOUT`       | `60`                | Per-call tool timeout in seconds.                       |
-| `AGENTIC_PYMOL_AGENT_PYTHON`  | *(auto-detected)*   | Absolute path to the agent's Python, if you want to override the auto-resolved `agent/.venv/bin/python`. |
+| `AGENTIC_PYMOL_AGENT_PYTHON`  | *(auto-detected)*   | Absolute path to the agent's Python, if you want to override the auto-resolved `agent/.venv/bin/python`. The agent project root is then derived from this path. |
+| `AGENTIC_PYMOL_AGENT_DIR`     | *(auto-derived)*    | Absolute path to the `agent/` project root. Required when the plugin was installed via the Plugin Manager (zip), since that copy does not include the `agent/` folder. |
 
 Most users only need `GOOGLE_API_KEY`.
 
@@ -253,6 +260,13 @@ cd agent && uv sync
 
 `.env.local` is missing from the installed plugin directory, or the key is
 empty. Check `~/.pymol/startup/agentic_pymol_plugin/.env.local`.
+
+### `[agent] failed to start agent subprocess: ... No such file or directory: '.../agentic_pymol_plugin/agent'`
+
+You installed via the zip, which does not bundle the `agent/` project. Set
+`AGENTIC_PYMOL_AGENT_PYTHON` (or `AGENTIC_PYMOL_AGENT_DIR`) in
+`.env.local`, or symlink your source `agent/` next to the installed plugin
+(see step 5).
 
 ### Lots of `[agent-stderr] ...` lines appear
 

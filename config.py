@@ -44,6 +44,22 @@ def load_config() -> dict:
 
         agent_python = resolve_agent_python(AGENT_DIR)
 
+    agent_dir_override = os.environ.get("AGENTIC_PYMOL_AGENT_DIR")
+    if agent_dir_override:
+        agent_dir = Path(agent_dir_override).expanduser().resolve()
+    elif override:
+        # `<agent_dir>/.venv/bin/python` → walk up to the agent project root.
+        agent_dir = agent_python.parent.parent.parent
+    else:
+        agent_dir = AGENT_DIR
+
+    if not agent_dir.is_dir():
+        raise ConfigError(
+            f"agent directory not found: {agent_dir}. Set AGENTIC_PYMOL_AGENT_DIR "
+            "in .env.local to the absolute path of the `agent/` project, or "
+            "symlink it next to the installed plugin."
+        )
+
     model = os.environ.get("AGENTIC_PYMOL_MODEL", DEFAULT_MODEL)
     recursion = int(os.environ.get("AGENTIC_PYMOL_RECURSION", DEFAULT_RECURSION))
 
@@ -52,7 +68,7 @@ def load_config() -> dict:
         "timeout_seconds": int(os.environ.get("AGENTIC_PYMOL_TIMEOUT", DEFAULT_TIMEOUT)),
         "recursion_limit": recursion,
         "agent_python": agent_python,
-        "agent_dir": AGENT_DIR,
+        "agent_dir": agent_dir,
         "agent_env": {
             "GOOGLE_API_KEY": api_key,
             "AGENTIC_PYMOL_MODEL": model,
