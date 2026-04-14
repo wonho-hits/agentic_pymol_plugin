@@ -124,23 +124,40 @@ GOOGLE_API_KEY=AIzaSy...여러분의_키...
 
 ### 5. PyMOL에 플러그인 등록
 
+PyMOL Plugin Manager는 `.py`, `.zip`, `.tar.gz`만 받기 때문에, 먼저
+프로젝트 루트에서 zip을 빌드합니다.
+
+```bash
+make plugin
+```
+
+`dist/agentic_pymol_plugin.zip` 이 생성됩니다. 이 zip에는 PyMOL 안에서
+실행되는 파일들(`__init__.py`, `config.py`, `plugin_side/`)만 들어있습니다.
+`agent/` uv 프로젝트는 별도 프로세스로 실행되므로 zip에 포함되지 않습니다.
+
 PyMOL 상단 메뉴에서:
 
 **Plugin → Plugin Manager → Install New Plugin → Choose file...**
 
-- 파일 선택 대화상자에서 이 프로젝트 폴더를 **디렉토리째** 선택하세요.
-- PyMOL이 플러그인을 `~/.pymol/startup/agentic_pymol_plugin/` 로 복사합니다.
-- 플러그인 매니저는 `.env.local` 같은 숨김 파일이나 `agent/.venv/` 폴더를
-  복사하지 않을 수 있습니다. 복사되지 않았다면 수동으로 옮겨 주세요.
+- `dist/agentic_pymol_plugin.zip` 을 선택하세요.
+- PyMOL이 압축을 풀어 `~/.pymol/startup/agentic_pymol_plugin/` 로 설치합니다.
+- zip에는 `.env.local` 과 `agent/.venv/` 가 들어있지 않습니다. 설치 후
+  연결해 주세요.
   ```bash
   cp .env.local ~/.pymol/startup/agentic_pymol_plugin/.env.local
-  cp -R agent/.venv ~/.pymol/startup/agentic_pymol_plugin/agent/.venv
   ```
-  또는, 복사 대신 프로젝트 폴더 전체를 심볼릭 링크로 걸 수도 있습니다.
-  ```bash
-  ln -s ~/Projects/agentic_pymol_plugin ~/.pymol/startup/agentic_pymol_plugin
-  ```
-  심볼릭 링크로 두면 원본을 수정하자마자 PyMOL 재시작 시 바로 반영됩니다.
+  그리고 에이전트 환경 위치를 다음 중 하나로 알려 주세요.
+  - `.env.local` 에 절대 경로로
+    `AGENTIC_PYMOL_AGENT_PYTHON=/절대/경로/agent/.venv/bin/python` 추가, 또는
+  - 설치된 플러그인 폴더 옆에 agent 프로젝트를 심볼릭 링크:
+    ```bash
+    ln -s ~/Projects/agentic_pymol_plugin/agent \
+          ~/.pymol/startup/agentic_pymol_plugin/agent
+    ```
+
+개발 중에는 zip을 매번 새로 빌드하지 말고, 소스 트리를 통째로 startup
+폴더에 심볼릭 링크하는 [실시간 편집 작업 흐름](#실시간-편집-작업-흐름)을
+권장합니다.
 
 PyMOL을 재시작하면 플러그인이 자동으로 로드되면서 아래 명령들이 등록됩니다.
 
@@ -249,8 +266,8 @@ PyMOL> ask_reset      # 프로세스 재시작 (대화 기록 초기화)
 
 ### 실시간 편집 작업 흐름
 
-플러그인 매니저로 재설치하는 대신, 소스 디렉토리를 PyMOL 시작 폴더로
-심볼릭 링크하면 편합니다.
+매번 zip을 다시 빌드해 플러그인 매니저로 재설치하는 대신, 소스 디렉토리를
+PyMOL 시작 폴더로 심볼릭 링크하면 편합니다.
 
 ```bash
 ln -s ~/Projects/agentic_pymol_plugin ~/.pymol/startup/agentic_pymol_plugin
@@ -325,6 +342,16 @@ ask "..."  ─►  AgentClient ─► subprocess (agent-server)
 ---
 
 ## 개발자 가이드
+
+### 설치용 zip 빌드
+
+```bash
+make plugin     # → dist/agentic_pymol_plugin.zip
+make clean      # dist/ 삭제
+```
+
+Makefile은 플러그인 쪽 파일만 `dist/build/` 로 복사한 뒤 zip으로 묶고,
+`__pycache__` 와 `.DS_Store` 는 제외합니다.
 
 ### 테스트 실행
 

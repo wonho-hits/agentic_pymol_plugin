@@ -127,24 +127,40 @@ GOOGLE_API_KEY=AIzaSy...your_key_here...
 
 ### 5. Install the plugin into PyMOL
 
+PyMOL's Plugin Manager only accepts `.py`, `.zip`, or `.tar.gz`, so build a
+zip from the project root:
+
+```bash
+make plugin
+```
+
+This produces `dist/agentic_pymol_plugin.zip` containing just the in-process
+plugin files (`__init__.py`, `config.py`, `plugin_side/`). The `agent/` uv
+project stays where it is — it runs out-of-process and is not bundled in the
+zip.
+
 In PyMOL:
 
 **Plugin → Plugin Manager → Install New Plugin → Choose file...**
 
-- Select this project **as a directory**.
-- PyMOL copies the plugin to `~/.pymol/startup/agentic_pymol_plugin/`.
-- The Plugin Manager may skip hidden files (like `.env.local`) and the
-  `agent/.venv/` folder. If they did not come along, copy them manually:
+- Select `dist/agentic_pymol_plugin.zip`.
+- PyMOL extracts it into `~/.pymol/startup/agentic_pymol_plugin/`.
+- The zip does **not** include `.env.local` or the `agent/.venv/`. Wire them
+  up after install:
   ```bash
   cp .env.local ~/.pymol/startup/agentic_pymol_plugin/.env.local
-  cp -R agent/.venv ~/.pymol/startup/agentic_pymol_plugin/agent/.venv
   ```
-  Or, instead of copying, symlink the whole project into `~/.pymol/startup/`:
-  ```bash
-  ln -s ~/Projects/agentic_pymol_plugin ~/.pymol/startup/agentic_pymol_plugin
-  ```
-  With a symlink you edit the original source and PyMOL picks up the changes
-  on its next start.
+  Then point the plugin at the agent environment with one of:
+  - Set `AGENTIC_PYMOL_AGENT_PYTHON=/absolute/path/to/agent/.venv/bin/python`
+    in `.env.local`, **or**
+  - Symlink the agent project next to the installed plugin:
+    ```bash
+    ln -s ~/Projects/agentic_pymol_plugin/agent \
+          ~/.pymol/startup/agentic_pymol_plugin/agent
+    ```
+
+For live-edit development, skip the zip and symlink the whole source tree
+into PyMOL's startup folder (see [Live-edit workflow](#live-edit-workflow)).
 
 Restart PyMOL. The plugin loads automatically and registers the commands below.
 
@@ -252,8 +268,8 @@ PyMOL> ask_reset      # restart the process (also clears memory)
 
 ### Live-edit workflow
 
-Instead of reinstalling through the Plugin Manager, symlink the source
-directory into PyMOL's startup folder:
+Instead of rebuilding the zip through the Plugin Manager on every change,
+symlink the source directory into PyMOL's startup folder:
 
 ```bash
 ln -s ~/Projects/agentic_pymol_plugin ~/.pymol/startup/agentic_pymol_plugin
@@ -332,6 +348,16 @@ two copies.
 ---
 
 ## Developer guide
+
+### Build the installable zip
+
+```bash
+make plugin     # → dist/agentic_pymol_plugin.zip
+make clean      # remove dist/
+```
+
+The Makefile copies only the plugin-side files into `dist/build/` and zips
+that staging directory, stripping `__pycache__` and `.DS_Store`.
 
 ### Running tests
 
