@@ -67,6 +67,7 @@ class AgentClient:
         self._current_request: int | None = None
         self._current_done = threading.Event()
         self._ready_event = threading.Event()
+        self._ready_received = False
         self._closed = False
 
     # ---- public API -------------------------------------------------------
@@ -130,6 +131,11 @@ class AgentClient:
 
         if not self._ready_event.wait(ready_timeout):
             raise AgentClientError("agent did not become ready in time")
+        if not self._ready_received:
+            raise AgentClientError(
+                "agent subprocess exited before sending 'ready' "
+                "(check the [agent-stderr] lines above for the real error)"
+            )
 
     def ask(self, prompt: str) -> bool:
         """Send a request. Returns False if another request is in flight."""
@@ -250,6 +256,7 @@ class AgentClient:
             self._on_event(
                 f"[agent] ready (server v{msg.payload.get('version', '?')})"
             )
+            self._ready_received = True
             self._ready_event.set()
             return
 
