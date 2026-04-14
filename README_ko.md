@@ -26,11 +26,11 @@ PyMOL> ask 2wyk 리간드-단백질 interface를 stick으로 보여줘
 
 ```
 ┌─────────────────────────────┐   ndjson over   ┌─────────────────────────────┐
-│ PyMOL 프로세스 (Python 3.10)│  stdin/stdout   │ Agent 프로세스 (Python 3.11)│
+│ PyMOL 프로세스 (Python 3.10)  │  stdin/stdout   │ Agent 프로세스 (Python 3.11)  │
 │                             │ ◄─────────────► │                             │
-│ • 플러그인 UI / 명령 등록   │   JSON 한 줄   │ • deepagents + LangChain    │
-│ • run_pymol_python 실행     │    = 메시지 1개 │ • Gemini (google-genai)     │
-│ • AST safety 검사           │                 │ • uv가 관리하는 .venv       │
+│ • 플러그인 UI / 명령 등록       │   JSON 한 줄      │ • deepagents + LangChain    │
+│ • run_pymol_python 실행      │    = 메시지 1개    │ • Gemini (google-genai)     │
+│ • AST safety 검사            │                 │ • uv가 관리하는 .venv          │
 └─────────────────────────────┘                 └─────────────────────────────┘
 ```
 
@@ -119,7 +119,7 @@ cp .env.example .env.local
 키로 바꾸세요.
 
 ```dotenv
-GOOGLE_API_KEY=AIzaSy...여러분의_키...
+GOOGLE_API_KEY=여러분의_키
 ```
 
 ### 5. PyMOL에 플러그인 등록
