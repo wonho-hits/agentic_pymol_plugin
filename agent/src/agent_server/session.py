@@ -1,0 +1,182 @@
+"""Runs one deep-agent request and streams structured events.
+
+Unlike the in-process version this module knows nothing about PyMOL —
+``run_pymol_python`` is wired in from the outside as a LangChain tool
+bound to a :class:`RemoteToolBridge`. Events are published through an
+``emit`` callback as plain ``dict`` payloads so the server can forward
+them as ndjson messages.
+"""
+from __future__ import annotations
+
+import traceback
+from collections.abc import Callable, Iterable
+from pathlib import Path
+from typing import Any
+
+from deepagents import create_deep_agent
+from langchain_google_genai import ChatGoogleGenerativeAI
+
+from .subagents import python_executor_spec
+
+_PROMPT_DIR = Path(__file__).resolve().parent / "prompts"
+_MAX_EVENT_LEN = 600
+
+
+EventEmitter = Callable[[str, dict[str, Any]], None]
+"""``emit(kind, fields) -> None`` — kind is one of protocol.EVENT_*."""
+
+
+def _text_of(msg: Any) -> str:
+    if isinstance(msg, dict):
+        content = msg.get("content")
+    else:
+        content = getattr(msg, "content", None)
+    if content is None:
+        return ""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts: list[str] = []
+        for p in content:
+            if isinstance(p, dict):
+                t = p.get("text") or p.get("content") or ""
+                if t:
+                    parts.append(str(t))
+            else:
+                parts.append(str(p))
+        return "\n".join(parts)
+    return str(content)
+
+
+def _tool_calls_of(msg: Any) -> list[dict]:
+    if isinstance(msg, dict):
+        return list(msg.get("tool_calls") or [])
+    calls = getattr(msg, "tool_calls", None) or []
+    out: list[dict] = []
+    for c in calls:
+        if isinstance(c, dict):
+            out.append(c)
+        else:
+            out.append({"name": getattr(c, "name", "?"), "args": getattr(c, "args", {})})
+    return out
+
+
+def _short(text: str, limit: int = _MAX_EVENT_LEN) -> str:
+    text = text.strip()
+    if not text:
+        return ""
+    if len(text) <= limit:
+        return text
+    return text[:limit] + f" …(+{len(text) - limit} chars)"
+
+
+class AgentRunner:
+    """One request. Builds a fresh deep agent graph, streams, emits events."""
+
+    def __init__(
+        self,
+        model_name: str,
+        run_pymol_python: Any,
+        emit: EventEmitter,
+        recursion_limit: int = 50,
+    ) -> None:
+        self._emit = emit
+        self._recursion_limit = recursion_limit
+
+        llm = ChatGoogleGenerativeAI(model=model_name, temperature=0.2)
+        system_prompt = (_PROMPT_DIR / "main.md").read_text(encoding="utf-8")
+
+        self._agent = create_deep_agent(
+            model=llm,
+            tools=[run_pymol_python],
+            system_prompt=system_prompt,
+            subagents=[python_executor_spec(run_pymol_python)],
+        )
+
+    def run(self, messages: list[dict], thread_id: str) -> tuple[str, list[dict]]:
+        """Execute one turn. Returns ``(final_text, updated_messages)``.
+
+        ``messages`` is the conversation history in OpenAI chat format
+        (``{"role": "...", "content": "..."}``). The returned list is the
+        history extended with the assistant's reply (if any).
+        """
+        config = {
+            "configurable": {"thread_id": thread_id},
+            "recursion_limit": self._recursion_limit,
+        }
+        inputs = {"messages": list(messages)}
+        history = list(messages)
+
+        final_state: dict | None = None
+        try:
+            for chunk in self._agent.stream(inputs, config=config, stream_mode="updates"):
+                self._handle_chunk(chunk)
+                final_state = chunk
+        except Exception as exc:
+            self._emit("info", {"text": f"ERROR: {exc}"})
+            raise RuntimeError(f"{exc}\n{traceback.format_exc()}") from exc
+
+        final_text = self._extract_final(final_state)
+        if final_text:
+            history.append({"role": "assistant", "content": final_text})
+        return final_text, history
+
+    # ---- internals ---------------------------------------------------------
+
+    def _handle_chunk(self, chunk: dict) -> None:
+        if not isinstance(chunk, dict):
+            return
+        for node_name, update in chunk.items():
+            if not isinstance(update, dict):
+                continue
+            msgs: Iterable = update.get("messages") or []
+            for m in msgs:
+                self._render_message(node_name, m)
+
+    def _render_message(self, node: str, msg: Any) -> None:
+        role = msg.get("type") if isinstance(msg, dict) else getattr(msg, "type", None)
+        tool_calls = _tool_calls_of(msg)
+        text = _text_of(msg)
+
+        if role == "tool":
+            name = msg.get("name") if isinstance(msg, dict) else getattr(msg, "name", "tool")
+            if text:
+                self._emit(
+                    "tool_output",
+                    {"node": node, "name": name, "text": _short(text, 400)},
+                )
+            return
+
+        if tool_calls:
+            for tc in tool_calls:
+                name = tc.get("name", "?")
+                args = tc.get("args") or {}
+                preview = ""
+                if isinstance(args, dict):
+                    code = args.get("code")
+                    if isinstance(code, str):
+                        preview = _short(code, 200).replace("\n", " ⏎ ")
+                    else:
+                        preview = _short(str(args), 200)
+                self._emit(
+                    "tool_call_preview",
+                    {"node": node, "name": name, "preview": preview},
+                )
+
+        if text:
+            self._emit("message", {"node": node, "text": _short(text)})
+
+    def _extract_final(self, final_state: dict | None) -> str:
+        if not isinstance(final_state, dict):
+            return ""
+        last_text = ""
+        for update in final_state.values():
+            if not isinstance(update, dict):
+                continue
+            for m in update.get("messages") or []:
+                role = m.get("type") if isinstance(m, dict) else getattr(m, "type", None)
+                if role == "ai":
+                    t = _text_of(m)
+                    if t:
+                        last_text = t
+        return last_text

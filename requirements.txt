@@ -1,0 +1,4 @@
+# Plugin-side dependencies (loaded inside PyMOL's Python 3.10).
+# The heavy agent stack (deepagents, langchain, langgraph, google-genai)
+# lives in the out-of-process uv project under ``agent/`` — see agent/pyproject.toml.
+python-dotenv>=1.0.0
