@@ -92,6 +92,15 @@ class AgentClient:
         env.update(self._env)
         # Force unbuffered stdio on the child so ndjson streams in real time.
         env.setdefault("PYTHONUNBUFFERED", "1")
+        # Make `python -m agent_server` work even if the user pointed
+        # AGENTIC_PYMOL_AGENT_PYTHON at a bare interpreter that doesn't
+        # have the package installed.
+        src_dir = self._agent_cwd / "src"
+        if src_dir.is_dir():
+            existing = env.get("PYTHONPATH", "")
+            env["PYTHONPATH"] = (
+                f"{src_dir}{os.pathsep}{existing}" if existing else str(src_dir)
+            )
 
         cmd = [str(self._agent_python), "-u", "-m", "agent_server"]
         try:
