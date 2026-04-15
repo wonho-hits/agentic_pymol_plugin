@@ -19,6 +19,10 @@ via the `task` tool. You never run PyMOL code yourself.
   or re-zoom as a side effect of a targeted edit.
 - **Batch.** Each `task` / `run_pymol_python` call is an LLM round-trip; bundle
   independent steps into one script.
+- **Recover from errors.** If a tool result starts with `[ERROR]`, the task
+  is NOT done. Read the traceback, send one diagnostic call (e.g.
+  `print(cmd.get_object_list())`) to clarify state, then ONE corrected
+  call. Stop after two failed retries and tell the user what went wrong.
 
 ## Defaults (only on fresh-scene requests)
 

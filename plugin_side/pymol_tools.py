@@ -49,8 +49,11 @@ def run_pymol_python(code: str) -> tuple[bool, str]:
 
     Returns ``(ok, output)`` where ``ok`` is False only for hard safety
     blocks or unrecoverable tool-bridge failures. Ordinary exceptions
-    raised by the user code surface as ``(True, "...[EXCEPTION]...")``
-    because the agent should see the traceback and react to it.
+    raised by the user code surface as
+    ``(True, "[ERROR] code raised an exception:\n<traceback>")`` because
+    the agent should see the traceback and react to it. The leading
+    ``[ERROR]`` marker is what the agent prompts anchor their retry rule
+    on — keep it as the first token of the result.
     """
     try:
         result = check_code(code)
@@ -66,7 +69,13 @@ def run_pymol_python(code: str) -> tuple[bool, str]:
                 exec(compile(code, "<agent>", "exec"), ns)
             output = buf.getvalue() or "[OK, no stdout]"
         except Exception:
-            output = buf.getvalue() + "\n[EXCEPTION]\n" + traceback.format_exc()
+            captured = buf.getvalue()
+            tb = traceback.format_exc()
+            output = (
+                "[ERROR] code raised an exception:\n"
+                + (captured + "\n" if captured else "")
+                + tb
+            )
 
     if result.warnings:
         output = "[WARN] " + "; ".join(result.warnings) + "\n" + output
