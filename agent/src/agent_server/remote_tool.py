@@ -67,8 +67,8 @@ class RemoteToolBridge:
 
     # ---- tool-facing API ---------------------------------------------------
 
-    def build_tool(self) -> Any:
-        """Return a LangChain tool bound to this bridge."""
+    def build_tools(self) -> list[Any]:
+        """Return all LangChain tools bound to this bridge."""
         bridge = self
 
         @tool
@@ -86,7 +86,26 @@ class RemoteToolBridge:
             """
             return bridge._call("run_pymol_python", {"code": code})
 
-        return run_pymol_python
+        @tool
+        def inspect_session() -> str:
+            """Return a JSON snapshot of the current PyMOL session.
+
+            The snapshot lists every loaded object with its atom count,
+            chain list, and detected non-solvent HETATM (ligand candidate)
+            groups, plus all user-created selections with their atom counts.
+
+            Call this whenever you would otherwise write a probe like
+            ``print(cmd.get_object_list())`` or ``print(cmd.get_chains(...))``
+            — it is faster and gives you a parseable result. Does not
+            modify the session.
+            """
+            return bridge._call("inspect_session", {})
+
+        return [run_pymol_python, inspect_session]
+
+    def build_tool(self) -> Any:  # pragma: no cover — kept for callers that only want the primary tool
+        """Legacy alias: returns just ``run_pymol_python``."""
+        return self.build_tools()[0]
 
     # ---- internals ---------------------------------------------------------
 

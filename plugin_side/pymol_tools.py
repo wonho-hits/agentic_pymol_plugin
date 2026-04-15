@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import json
 import threading
 import traceback
 
@@ -82,8 +83,84 @@ def run_pymol_python(code: str) -> tuple[bool, str]:
     return True, _truncate(output)
 
 
+def inspect_session() -> tuple[bool, str]:
+    """Structured JSON snapshot of the live PyMOL session.
+
+    Returned JSON has:
+      objects: [{name, n_atoms, chains, ligand_groups: [{chain,resi,resn,n_atoms}]}]
+      selections: [{name, n_atoms}]   (excludes the anonymous 'sele')
+
+    Errors inside the probe do not raise; the field is simply omitted and a
+    top-level 'warnings' list records what failed. Always returns ok=True.
+    """
+    try:
+        from pymol import cmd, stored  # type: ignore
+    except Exception as exc:  # pragma: no cover — PyMOL always present at runtime
+        return True, json.dumps({"error": f"pymol unavailable: {exc}"})
+
+    snap: dict = {"objects": [], "selections": [], "warnings": []}
+
+    with _EXEC_LOCK:
+        try:
+            object_names = list(cmd.get_object_list() or [])
+        except Exception as exc:
+            snap["warnings"].append(f"get_object_list: {exc}")
+            object_names = []
+
+        for obj in object_names:
+            info: dict = {"name": obj}
+            try:
+                info["n_atoms"] = int(cmd.count_atoms(obj))
+            except Exception as exc:
+                snap["warnings"].append(f"count_atoms({obj}): {exc}")
+            try:
+                info["chains"] = sorted(set(cmd.get_chains(obj) or []))
+            except Exception as exc:
+                snap["warnings"].append(f"get_chains({obj}): {exc}")
+
+            # Ligand groups: non-solvent, non-ion HETATM residues.
+            try:
+                stored._lig = set()
+                cmd.iterate(
+                    f"{obj} and hetatm and not (resn HOH or solvent or inorganic)",
+                    "stored._lig.add((chain, resi, resn))",
+                )
+                groups = []
+                for chain, resi, resn in sorted(stored._lig):
+                    n = 0
+                    try:
+                        n = int(cmd.count_atoms(
+                            f"{obj} and chain {chain} and resi {resi} and resn {resn}"
+                        ))
+                    except Exception:
+                        pass
+                    groups.append({"chain": chain, "resi": resi, "resn": resn, "n_atoms": n})
+                info["ligand_groups"] = groups
+            except Exception as exc:
+                snap["warnings"].append(f"ligand_groups({obj}): {exc}")
+
+            snap["objects"].append(info)
+
+        try:
+            for name in cmd.get_names("selections") or []:
+                if name == "sele":
+                    continue
+                try:
+                    n_atoms = int(cmd.count_atoms(name))
+                except Exception:
+                    n_atoms = -1
+                snap["selections"].append({"name": name, "n_atoms": n_atoms})
+        except Exception as exc:
+            snap["warnings"].append(f"get_names(selections): {exc}")
+
+    if not snap["warnings"]:
+        snap.pop("warnings")
+    return True, json.dumps(snap, ensure_ascii=False, indent=2)
+
+
 TOOL_HANDLERS = {
     "run_pymol_python": lambda args: run_pymol_python(str(args.get("code", ""))),
+    "inspect_session": lambda args: inspect_session(),
 }
 
 

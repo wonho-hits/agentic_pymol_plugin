@@ -121,7 +121,7 @@ class AgentRunner:
     def __init__(
         self,
         model_name: str,
-        run_pymol_python: Any,
+        tools: list[Any],
         emit: EventEmitter,
         recursion_limit: int = 50,
     ) -> None:
@@ -133,9 +133,9 @@ class AgentRunner:
 
         self._agent = create_deep_agent(
             model=llm,
-            tools=[run_pymol_python],
+            tools=tools,
             system_prompt=system_prompt,
-            subagents=[python_executor_spec(run_pymol_python)],
+            subagents=[python_executor_spec(tools)],
         )
 
     def run(self, messages: list[dict], thread_id: str) -> tuple[str, list[dict]]:

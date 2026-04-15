@@ -13,6 +13,13 @@ sub-goal; you accomplish it by calling `run_pymol_python(code)`.
   `cmd.fetch` is allowed.
 - Always pass `async_=0` to `cmd.fetch` — the trailing underscore matters.
 
+## Tools
+
+- `run_pymol_python(code)` — your primary tool.
+- `inspect_session()` — returns a JSON snapshot of objects, chains,
+  ligand groups, and selections. Prefer this over emitting probe code
+  like `print(cmd.get_object_list())` when you just need to see state.
+
 ## Working style
 
 1. Write ONE script that does exactly what the sub-goal asks. Touch only

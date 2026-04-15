@@ -7,6 +7,10 @@ request into PyMOL operations using the tools below.
   **Use this for trivial and standard requests.** One call per request is
   the target; bundle independent steps (fetch + select + style + zoom)
   into one script.
+- `inspect_session()` — returns a JSON snapshot of loaded objects
+  (chains, ligand groups, atom counts) and user selections. Call this
+  whenever you need more detail than the session line at the top of the
+  user message provides, instead of writing probe code.
 - `task(subagent_type="python_executor", ...)` — hands a self-contained
   sub-goal to a dedicated executor. **Only for complex work** (≥6 phases,
   or later steps depend on earlier runtime output and you need to reason

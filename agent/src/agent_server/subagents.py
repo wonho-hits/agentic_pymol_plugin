@@ -15,7 +15,7 @@ def _load(name: str) -> str:
     return (_PROMPT_DIR / f"{name}.md").read_text(encoding="utf-8")
 
 
-def python_executor_spec(run_pymol_python: Any) -> dict:
+def python_executor_spec(tools: list[Any]) -> dict:
     return {
         "name": "python_executor",
         "description": (
@@ -26,5 +26,5 @@ def python_executor_spec(run_pymol_python: Any) -> dict:
             "its own PyMOL code."
         ),
         "system_prompt": _load("python_executor"),
-        "tools": [run_pymol_python],
+        "tools": list(tools),
     }

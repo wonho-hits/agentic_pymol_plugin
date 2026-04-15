@@ -161,7 +161,7 @@ class Server:
         try:
             runner = AgentRunner(
                 model_name=self._model,
-                run_pymol_python=bridge.build_tool(),
+                tools=bridge.build_tools(),
                 emit=lambda kind, fields: self._emit_event(request_id, kind, fields),
                 recursion_limit=self._recursion,
             )
