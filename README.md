@@ -237,7 +237,7 @@ Tune behaviour through `.env.local`:
 | ----------------------------- | ------------------- | ------------------------------------------------------- |
 | `GOOGLE_API_KEY`              | *(required)*        | Gemini API key.                                         |
 | `GEMINI_API_KEY`              | —                   | Accepted as an alternative name for the key.            |
-| `AGENTIC_PYMOL_MODEL`         | `gemini-2.5-flash`  | Model to use. Use `gemini-2.5-flash-lite` for speed/cost on trivial workloads, `gemini-2.5-pro` for harder tasks. |
+| `AGENTIC_PYMOL_MODEL`         | `gemini-3-flash-preview` | Model to use. Fall back to `gemini-2.5-flash` if the preview is rate-limited; `gemini-2.5-flash-lite` for speed/cost on trivial workloads; `gemini-2.5-pro` for harder tasks. |
 | `AGENTIC_PYMOL_RECURSION`     | `50`                | LangGraph recursion limit.                              |
 | `AGENTIC_PYMOL_TIMEOUT`       | `60`                | Per-call tool timeout in seconds.                       |
 | `AGENTIC_PYMOL_AGENT_PYTHON`  | *(auto-detected)*   | Absolute path to the agent's Python, if you want to override the auto-resolved `agent/.venv/bin/python`. The agent project root is then derived from this path. |

@@ -15,7 +15,7 @@ PLUGIN_ROOT = Path(__file__).resolve().parent
 ENV_FILE = PLUGIN_ROOT / ".env.local"
 AGENT_DIR = PLUGIN_ROOT / "agent"
 
-DEFAULT_MODEL = "gemini-2.5-flash"
+DEFAULT_MODEL = "gemini-3-flash-preview"
 DEFAULT_TIMEOUT = 60
 DEFAULT_RECURSION = 50
 
