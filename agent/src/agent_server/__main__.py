@@ -31,6 +31,27 @@ DEFAULT_RECURSION = 50
 log = logging.getLogger("agent_server")
 
 
+def _prepend_session_context(prompt: str, context: dict | None) -> str:
+    """Annotate the user prompt with a summary of the live PyMOL session.
+
+    Keeps the agent from re-fetching or recreating objects that already
+    exist. Empty/missing context is passed through unchanged.
+    """
+    if not context:
+        return prompt
+    objects = context.get("objects") or []
+    selections = context.get("selections") or []
+    if not objects and not selections:
+        return prompt
+    lines = ["<pymol_session>"]
+    lines.append(f"  objects: {list(objects)}")
+    lines.append(f"  user_selections: {list(selections)}")
+    lines.append("</pymol_session>")
+    lines.append("")
+    lines.append(prompt)
+    return "\n".join(lines)
+
+
 class Server:
     def __init__(self) -> None:
         # Swap stdout for stderr so stray prints from libraries/tools do
@@ -105,6 +126,7 @@ class Server:
         if not isinstance(prompt, str) or not prompt.strip():
             self._write(protocol.error(request_id, "request missing 'prompt'"))
             return
+        context = msg.payload.get("context") if isinstance(msg.payload.get("context"), dict) else None
 
         with self._active_lock:
             if self._active_request is not None:
@@ -126,13 +148,19 @@ class Server:
 
         thread = threading.Thread(
             target=self._run_request,
-            args=(request_id, prompt, bridge),
+            args=(request_id, prompt, context, bridge),
             daemon=True,
             name=f"agent-request-{request_id}",
         )
         thread.start()
 
-    def _run_request(self, request_id: int, prompt: str, bridge: RemoteToolBridge) -> None:
+    def _run_request(
+        self,
+        request_id: int,
+        prompt: str,
+        context: dict | None,
+        bridge: RemoteToolBridge,
+    ) -> None:
         try:
             runner = AgentRunner(
                 model_name=self._model,
@@ -140,7 +168,8 @@ class Server:
                 emit=lambda kind, fields: self._emit_event(request_id, kind, fields),
                 recursion_limit=self._recursion,
             )
-            self._history.append({"role": "user", "content": prompt})
+            annotated = _prepend_session_context(prompt, context)
+            self._history.append({"role": "user", "content": annotated})
             final_text, new_history = runner.run(self._history, self._thread_id)
             self._history = new_history
             self._write(protocol.done(request_id, final_text))

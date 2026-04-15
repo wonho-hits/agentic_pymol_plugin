@@ -123,8 +123,11 @@ def error(request_id: int | None, message: str, *, traceback: str | None = None)
 # ---- builders (plugin → agent) -----------------------------------------------
 
 
-def request(request_id: int, prompt: str) -> dict:
-    return {"type": MSG_REQUEST, "id": request_id, "prompt": prompt}
+def request(request_id: int, prompt: str, context: dict | None = None) -> dict:
+    payload: dict = {"type": MSG_REQUEST, "id": request_id, "prompt": prompt}
+    if context:
+        payload["context"] = context
+    return payload
 
 
 def tool_result(request_id: int, call_id: str, ok: bool, result: str) -> dict:

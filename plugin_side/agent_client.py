@@ -20,7 +20,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from . import protocol
-from .pymol_tools import TOOL_HANDLERS
+from .pymol_tools import TOOL_HANDLERS, snapshot_session
 
 log = logging.getLogger("agent_client")
 
@@ -148,7 +148,11 @@ class AgentClient:
         self._current_request = rid
         self._current_done.clear()
         self._on_event(f"[agent] ▶ {_short(prompt, 200)}")
-        self._send(protocol.request(rid, prompt))
+        try:
+            context = snapshot_session()
+        except Exception:
+            context = {}
+        self._send(protocol.request(rid, prompt, context))
         return True
 
     def wait_idle(self, timeout: float | None = None) -> bool:

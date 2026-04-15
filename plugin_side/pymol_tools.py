@@ -76,3 +76,29 @@ def run_pymol_python(code: str) -> tuple[bool, str]:
 TOOL_HANDLERS = {
     "run_pymol_python": lambda args: run_pymol_python(str(args.get("code", ""))),
 }
+
+
+def snapshot_session() -> dict:
+    """Return a small summary of the current PyMOL session state.
+
+    The plugin attaches this to each request so the agent plans around
+    the live session instead of re-fetching objects that already exist.
+    Must never raise — returns a best-effort snapshot.
+    """
+    try:
+        from pymol import cmd  # type: ignore
+    except Exception:
+        return {}
+
+    snap: dict = {}
+    try:
+        snap["objects"] = list(cmd.get_object_list() or [])
+    except Exception:
+        snap["objects"] = []
+    try:
+        snap["selections"] = [
+            n for n in (cmd.get_names("selections") or []) if n != "sele"
+        ]
+    except Exception:
+        snap["selections"] = []
+    return snap
