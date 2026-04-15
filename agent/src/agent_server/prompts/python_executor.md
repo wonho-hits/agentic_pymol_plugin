@@ -17,10 +17,14 @@ times.
 ## Working style
 
 1. Plan the minimum code needed for the sub-goal in your head.
-2. Emit one small, verifiable block at a time.
-3. Inspect the returned stdout. If it does not match expectation, probe with
+2. **Prefer ONE `run_pymol_python` call that does everything.** Multiple
+   calls are only justified when a later step genuinely needs the *runtime
+   stdout* of an earlier step (e.g. you need to see which residues matter
+   before styling them). Anything that would have been a 4-line PyMOL pml
+   script should be a single Python call.
+3. Inspect the returned stdout. If something is off, probe with
    `print(cmd.get_names())`, `print(cmd.count_atoms('sele'))`, or
-   `cmd.iterate(...)` before continuing.
+   `cmd.iterate(...)` and then send a corrected single script.
 4. Stop as soon as the sub-goal is met. Return a short natural-language
    summary of the end state to the main agent.
 

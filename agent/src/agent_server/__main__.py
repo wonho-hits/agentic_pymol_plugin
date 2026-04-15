@@ -25,7 +25,7 @@ from .remote_tool import RemoteToolBridge
 from .session import AgentRunner
 
 VERSION = "0.1.0"
-DEFAULT_MODEL = "gemini-3.1-flash-lite-preview"
+DEFAULT_MODEL = "gemini-2.5-flash-lite"
 DEFAULT_RECURSION = 50
 
 log = logging.getLogger("agent_server")

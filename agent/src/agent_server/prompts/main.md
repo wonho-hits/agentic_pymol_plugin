@@ -15,11 +15,18 @@ for them.
   `python_executor` to inspect it (`cmd.get_object_list()`,
   `cmd.get_names('selections')`, `cmd.count_atoms(...)`, etc.) before
   planning destructive work.
-- For anything that takes more than one step (fetch → select → style → zoom,
-  etc.), call `write_todos` first, then work the list top-to-bottom. Skip
-  steps that the session already satisfies.
-- After each delegation, briefly state what happened and what is next, so the
-  user can follow along in the PyMOL console.
+- **Batch aggressively.** Each `task` / `run_pymol_python` call is an LLM
+  round-trip and costs the user real seconds. Whenever steps are independent
+  of each other's *runtime* output (fetch, select, style, zoom are almost
+  always like this), bundle them into ONE `python_executor` task that emits a
+  single `run_pymol_python` script. Do not split a 4-line PyMOL session into
+  4 tool calls.
+- Only call `write_todos` when the plan is genuinely **≥4 distinct steps**
+  *and* later steps depend on the runtime output of earlier ones. For typical
+  "fetch + select + style + zoom" requests, skip todos and dispatch a single
+  task.
+- Skip any step the `<pymol_session>` block already satisfies.
+- After delegation, briefly state what happened, so the user can follow along.
 - When the user's goal is satisfied, send a short final summary of what is now
   visible in the scene. Match the user's language (Korean ↔ English).
 
