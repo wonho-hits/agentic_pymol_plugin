@@ -103,6 +103,18 @@ def _short(text: str, limit: int = _MAX_EVENT_LEN) -> str:
     return text[:limit] + f" …(+{len(text) - limit} chars)"
 
 
+def _short_smart(text: str, head: int = 240, tail: int = 480) -> str:
+    """Truncate keeping both ends — important for tracebacks where the last
+    line carries the real exception message."""
+    text = text.strip()
+    if not text:
+        return ""
+    if len(text) <= head + tail + 32:
+        return text
+    middle = len(text) - head - tail
+    return f"{text[:head]} …(+{middle} chars)…\n{text[-tail:]}"
+
+
 class AgentRunner:
     """One request. Builds a fresh deep agent graph, streams, emits events."""
 
@@ -177,7 +189,7 @@ class AgentRunner:
             if text:
                 self._emit(
                     "tool_output",
-                    {"node": node, "name": name, "text": _short(text, 400)},
+                    {"node": node, "name": name, "text": _short_smart(text)},
                 )
             return
 
