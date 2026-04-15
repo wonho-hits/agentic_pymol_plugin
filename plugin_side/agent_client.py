@@ -50,12 +50,15 @@ class AgentClient:
         on_event: EventSink,
         env: dict[str, str] | None = None,
         tool_handlers: dict[str, ToolHandler] | None = None,
+        stderr_log_path: Path | None = None,
     ) -> None:
         self._agent_python = agent_python
         self._agent_cwd = agent_cwd
         self._on_event = on_event
         self._env = env or {}
         self._tool_handlers = tool_handlers or TOOL_HANDLERS
+        self._stderr_log_path = stderr_log_path
+        self._stderr_file = None  # opened lazily in _stderr_loop
 
         self._proc: subprocess.Popen[str] | None = None
         self._reader: threading.Thread | None = None
@@ -245,15 +248,38 @@ class AgentClient:
         proc = self._proc
         if proc is None or proc.stderr is None:
             return
-        for raw in proc.stderr:
-            line = raw.rstrip()
-            if line:
-                # Surface agent-side logs with a clear prefix so the user
-                # can tell them apart from plugin output in PyMOL's log.
+        # Append agent stderr to a log file instead of printing to PyMOL's
+        # console. Users can `tail` it when debugging, but day-to-day the
+        # feedback area stays clean.
+        sink = None
+        if self._stderr_log_path is not None:
+            try:
+                self._stderr_log_path.parent.mkdir(parents=True, exist_ok=True)
+                sink = self._stderr_log_path.open("a", encoding="utf-8")
+                self._stderr_file = sink
+                sink.write(f"\n--- agent-stderr session {self._thread_id[:8]} ---\n")
+                sink.flush()
+            except Exception:
+                sink = None
+        try:
+            for raw in proc.stderr:
+                line = raw.rstrip()
+                if not line:
+                    continue
+                if sink is not None:
+                    try:
+                        sink.write(line + "\n")
+                        sink.flush()
+                    except Exception:
+                        pass
+                log.debug("agent-stderr: %s", line)
+        finally:
+            if sink is not None:
                 try:
-                    self._on_event(f"[agent-stderr] {line}")
+                    sink.close()
                 except Exception:
                     pass
+                self._stderr_file = None
 
     def _handle_message(self, msg: protocol.Message) -> None:
         if msg.type == protocol.MSG_READY:

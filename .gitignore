@@ -39,3 +39,6 @@ agent/.venv/
 *.pml~
 *.cif
 *.pdb
+
+# Plugin runtime log (agent stderr)
+agent.log

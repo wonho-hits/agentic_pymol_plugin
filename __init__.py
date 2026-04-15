@@ -19,8 +19,12 @@ Install the agent environment once with ``cd agent && uv sync``.
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 from .config import ConfigError, load_config
 from .plugin_side.agent_client import AgentClient, AgentClientError
+
+_STDERR_LOG = Path(__file__).resolve().parent / "agent.log"
 
 _CLIENT: AgentClient | None = None
 
@@ -41,10 +45,14 @@ def _ensure_client() -> AgentClient:
         agent_cwd=cfg["agent_dir"],
         on_event=_emit,
         env=cfg["agent_env"],
+        stderr_log_path=_STDERR_LOG,
     )
     client.start()
     _CLIENT = client
-    _emit(f"[agent] ready — model={cfg['model']} thread={client.thread_id[:8]}")
+    _emit(
+        f"[agent] ready — model={cfg['model']} thread={client.thread_id[:8]} "
+        f"(stderr → {_STDERR_LOG})"
+    )
     return _CLIENT
 
 
