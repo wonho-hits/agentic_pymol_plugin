@@ -61,6 +61,19 @@ def _tool_calls_of(msg: Any) -> list[dict]:
     return out
 
 
+def _is_noise_node(name: Any) -> bool:
+    """Suppress middleware echo nodes that just replay the input prompt.
+
+    deepagents wraps the agent in middleware nodes such as
+    ``PatchToolCallsMiddleware.before_agent`` that re-emit the user's
+    message before each step. The user already typed it; we don't need
+    to print it back. Heuristic: any node name with ``Middleware`` in it.
+    """
+    if not isinstance(name, str):
+        return False
+    return "Middleware" in name
+
+
 def _unwrap_messages(value: Any) -> list:
     """Coerce a state-channel value into a plain list of messages.
 
@@ -147,6 +160,8 @@ class AgentRunner:
         if not isinstance(chunk, dict):
             return
         for node_name, update in chunk.items():
+            if _is_noise_node(node_name):
+                continue
             if not isinstance(update, dict):
                 continue
             for m in _unwrap_messages(update.get("messages")):
@@ -189,7 +204,9 @@ class AgentRunner:
         if not isinstance(final_state, dict):
             return ""
         last_text = ""
-        for update in final_state.values():
+        for node_name, update in final_state.items():
+            if _is_noise_node(node_name):
+                continue
             if not isinstance(update, dict):
                 continue
             for m in _unwrap_messages(update.get("messages")):
