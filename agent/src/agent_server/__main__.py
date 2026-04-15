@@ -25,7 +25,7 @@ from .remote_tool import RemoteToolBridge
 from .session import AgentRunner
 
 VERSION = "0.1.0"
-DEFAULT_MODEL = "gemini-2.5-flash-lite"
+DEFAULT_MODEL = "gemini-2.5-flash"
 DEFAULT_RECURSION = 50
 
 log = logging.getLogger("agent_server")
@@ -35,21 +35,18 @@ def _prepend_session_context(prompt: str, context: dict | None) -> str:
     """Annotate the user prompt with a summary of the live PyMOL session.
 
     Keeps the agent from re-fetching or recreating objects that already
-    exist. Empty/missing context is passed through unchanged.
+    exist. Uses a single plain-English line prefix rather than XML-like
+    tags — smaller models otherwise parrot the tag block back instead of
+    treating it as state.
     """
     if not context:
         return prompt
-    objects = context.get("objects") or []
-    selections = context.get("selections") or []
+    objects = list(context.get("objects") or [])
+    selections = list(context.get("selections") or [])
     if not objects and not selections:
         return prompt
-    lines = ["<pymol_session>"]
-    lines.append(f"  objects: {list(objects)}")
-    lines.append(f"  user_selections: {list(selections)}")
-    lines.append("</pymol_session>")
-    lines.append("")
-    lines.append(prompt)
-    return "\n".join(lines)
+    state = f"(current PyMOL session — objects: {objects}; user selections: {selections})"
+    return f"{state}\n{prompt}"
 
 
 class Server:
