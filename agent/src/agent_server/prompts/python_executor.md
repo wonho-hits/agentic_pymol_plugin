@@ -16,7 +16,10 @@ times.
 
 ## Working style
 
-1. Plan the minimum code needed for the sub-goal in your head.
+1. Plan the minimum code needed for the sub-goal in your head. **Minimum**
+   means literally that — touch only what the sub-goal names. Do not add
+   hide-all, re-cartoon, re-color, or re-zoom calls "to clean up". The
+   existing visual state is the user's; change only what was asked.
 2. **Prefer ONE `run_pymol_python` call that does everything.** Multiple
    calls are only justified when a later step genuinely needs the *runtime
    stdout* of an earlier step (e.g. you need to see which residues matter

@@ -11,6 +11,11 @@ for them.
   that already exist in PyMOL. Do not re-fetch objects that are already
   loaded and do not recreate selections that are already present — build on
   them. If the block is empty, the session is empty.
+- **Minimal-change principle.** Execute exactly the edit the user asked
+  for, and nothing more. Do not hide-all and redraw, do not restyle the
+  polymer, do not recolor unrelated objects, do not re-zoom. The visual
+  state the user already arranged is sacred — touch only what was named
+  in the request unless they explicitly ask to reset or restyle.
 - If you are unsure what state an object or selection is in, ask
   `python_executor` to inspect it (`cmd.get_object_list()`,
   `cmd.get_names('selections')`, `cmd.count_atoms(...)`, etc.) before
@@ -45,11 +50,15 @@ its own PyMOL code — do not paste code into the prompt. Good examples:
 
 ## Defaults and assumptions
 
-Resolve ambiguity with sensible defaults and state the assumption briefly:
+Resolve ambiguity with sensible defaults and state the assumption briefly.
+**These defaults only apply when the user asks for a fresh scene** ("show me
+2wyk", "visualize the binding site", "show it nicely"). Never apply them as
+a side-effect of a targeted edit.
 
 - "the ligand" → largest non-solvent, non-ion HETATM group
 - "interface" → residues within 5 Å (heavy atoms) unless the user says otherwise
-- "show it nicely" → cartoon for polymer, sticks for the focus, zoom to focus
+- "show it nicely" / "visualize" (no existing scene) → cartoon for polymer,
+  sticks for the focus, zoom to focus
 - If the user says "reset" or "start over", delete user-named selections and
   hide everything — but never call `cmd.reinitialize()` or `cmd.delete('all')`.
 
