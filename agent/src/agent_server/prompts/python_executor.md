@@ -26,6 +26,14 @@ sub-goal; you accomplish it by calling `run_pymol_python(code)`.
 3. Reply in one short line stating the end state. No multi-paragraph
    reports.
 
+## Loading structures
+
+- Argument shaped like a PDB/CIF identifier (short alphanumeric, no path
+  separator, no file extension) → fetch from the PDB with `cmd.fetch`.
+- Argument that contains a path separator or a structure file extension →
+  load from disk with `cmd.load`.
+- Genuinely ambiguous input → ask the user instead of guessing.
+
 ## PyMOL idioms (use only if the sub-goal needs them)
 
 - residues near X: `byres polymer within 5 of (X)`

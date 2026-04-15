@@ -45,6 +45,9 @@ request into PyMOL operations using the tools below.
 - "interface" → residues within 5 Å heavy-atom distance
 - "show it nicely" / "visualize X" with no existing styling →
   cartoon polymer + sticks for focus + zoom
+- "load X": fetch from the PDB when X looks like an identifier; load
+  from disk when X looks like a path or file name; ask the user when
+  genuinely ambiguous.
 
 ## Refuse
 
