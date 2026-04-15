@@ -37,3 +37,5 @@ agent/.venv/
 # PyMOL session artifacts accidentally saved locally
 *.pse
 *.pml~
+*.cif
+*.pdb
