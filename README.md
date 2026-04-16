@@ -268,10 +268,23 @@ You installed via the zip, which does not bundle the `agent/` project. Set
 `.env.local`, or symlink your source `agent/` next to the installed plugin
 (see step 5).
 
-### Lots of `[agent-stderr] ...` lines appear
+### Where are the agent logs?
 
-That is normal. The agent process writes its logging to stderr; the plugin
-tags each line and forwards it to the PyMOL console. Useful while debugging.
+The agent subprocess writes its logging to stderr, which the plugin
+redirects to a file instead of the PyMOL console. The path is shown on
+startup:
+
+```text
+[agent] ready — model=... thread=... (stderr → .../agentic_pymol_plugin/agent.log)
+```
+
+Tail it in a separate terminal while debugging:
+
+```bash
+tail -f ~/.pymol/startup/agentic_pymol_plugin/agent.log
+```
+
+Each session is separated by a `--- agent-stderr session <id> ---` header.
 
 ### The agent seems stuck
 
@@ -410,8 +423,8 @@ flow.
 export AGENTIC_PYMOL_LOG=DEBUG
 ```
 
-Sets the logging level for the agent process (written to stderr, surfaced in
-PyMOL as `[agent-stderr] ...`).
+Sets the logging level for the agent process (written to `agent.log` next to
+the installed plugin; see "Where are the agent logs?" above).
 
 ---
 

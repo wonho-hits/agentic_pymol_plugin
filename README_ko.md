@@ -266,10 +266,22 @@ zip으로 설치한 경우 `agent/` 가 함께 복사되지 않아 발생하는 
 `AGENTIC_PYMOL_AGENT_DIR`)을 지정하거나, 소스의 `agent/` 를 설치 폴더 옆에
 심볼릭 링크하세요(5단계 참조).
 
-### `[agent-stderr] ...` 로그가 많이 보일 때
+### 에이전트 로그는 어디에?
 
-정상입니다. 에이전트 쪽의 logging이 stderr로 흘러나와 PyMOL 콘솔에 태그가
-붙어 표시됩니다. 디버깅할 때 유용합니다.
+에이전트 서브프로세스의 logging은 PyMOL 콘솔 대신 파일로 리다이렉트됩니다.
+시작 시 경로가 표시됩니다:
+
+```text
+[agent] ready — model=... thread=... (stderr → .../agentic_pymol_plugin/agent.log)
+```
+
+디버깅 시 별도 터미널에서 실시간으로 확인할 수 있습니다:
+
+```bash
+tail -f ~/.pymol/startup/agentic_pymol_plugin/agent.log
+```
+
+세션마다 `--- agent-stderr session <id> ---` 헤더로 구분됩니다.
 
 ### 에이전트가 먹통이 되었을 때
 
@@ -403,8 +415,8 @@ uv run agent-server
 export AGENTIC_PYMOL_LOG=DEBUG
 ```
 
-에이전트 프로세스의 logging 레벨을 조절합니다(stderr로 출력, PyMOL에는
-`[agent-stderr] ...` 태그로 나타남).
+에이전트 프로세스의 logging 레벨을 조절합니다(플러그인 옆의 `agent.log` 에
+기록됩니다. 위의 "에이전트 로그는 어디에?" 참조).
 
 ---
 
