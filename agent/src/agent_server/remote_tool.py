@@ -101,7 +101,37 @@ class RemoteToolBridge:
             """
             return bridge._call("inspect_session", {})
 
-        return [run_pymol_python, inspect_session]
+        @tool
+        def mutate_residue(obj: str, chain: str, resi: str, target_aa: str) -> str:
+            """Mutate a single residue in a loaded object.
+
+            Args:
+                obj: object name (e.g. ``"boltz2_cyclase_wt"``).
+                chain: chain identifier (e.g. ``"A"``). Pass an empty
+                    string to auto-detect when the residue number is
+                    unambiguous across chains.
+                resi: residue number as a string (e.g. ``"94"``).
+                target_aa: target amino acid, 3-letter UPPERCASE code
+                    (``"ASN"``, ``"ALA"``, ``"LYS"``, ...).
+
+            Use this instead of driving the mutagenesis wizard via
+            ``run_pymol_python``. The wizard's ``apply()`` can silently
+            delete the whole object when called with a bare
+            ``"object and resi N"`` selection; this tool uses the
+            selection-macro form, closes the wizard cleanly, cleans up
+            the ``_pk*`` leftover selections, and rolls back via
+            ``cmd.undo()`` if the object disappears.
+
+            Returns ``"[OK] mutated <obj>/<chain>/<resi> → <target>"`` on
+            success. Any string starting with ``[ERROR]`` means the
+            mutation did not happen — surface that to the user verbatim.
+            """
+            return bridge._call(
+                "mutate_residue",
+                {"obj": obj, "chain": chain, "resi": resi, "target_aa": target_aa},
+            )
+
+        return [run_pymol_python, inspect_session, mutate_residue]
 
     def build_tool(self) -> Any:  # pragma: no cover — kept for callers that only want the primary tool
         """Legacy alias: returns just ``run_pymol_python``."""

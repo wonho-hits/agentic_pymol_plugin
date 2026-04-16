@@ -11,6 +11,11 @@ request into PyMOL operations using the tools below.
   (chains, ligand groups, atom counts) and user selections. Call this
   whenever you need more detail than the session line at the top of the
   user message provides, instead of writing probe code.
+- `mutate_residue(obj, chain, resi, target_aa)` — mutate a single
+  residue via the PyMOL mutagenesis wizard, safely. Pass `chain=""` to
+  auto-detect when the resi is unambiguous. **Always use this tool for
+  mutations** — driving the wizard via `run_pymol_python` can silently
+  delete the entire object on apply.
 - `task(subagent_type="python_executor", ...)` — hands a self-contained
   sub-goal to a dedicated executor. **Only for complex work** (≥6 phases,
   or later steps depend on earlier runtime output and you need to reason

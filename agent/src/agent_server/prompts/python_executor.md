@@ -19,6 +19,11 @@ sub-goal; you accomplish it by calling `run_pymol_python(code)`.
 - `inspect_session()` — returns a JSON snapshot of objects, chains,
   ligand groups, and selections. Prefer this over emitting probe code
   like `print(cmd.get_object_list())` when you just need to see state.
+- `mutate_residue(obj, chain, resi, target_aa)` — mutate a single
+  residue via the PyMOL mutagenesis wizard, safely. Pass `chain=""` to
+  auto-detect when the resi is unambiguous. **Always use this tool for
+  mutations** — driving the wizard via `run_pymol_python` can silently
+  delete the entire object on apply.
 
 ## Working style
 
