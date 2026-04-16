@@ -40,6 +40,11 @@ sub-goal; you accomplish it by calling `run_pymol_python(code)`.
 - Argument that contains a path separator or a structure file extension →
   load from disk with `cmd.load`.
 - Genuinely ambiguous input → ask the user instead of guessing.
+- **At most ONE `cmd.fetch` per script.** If the sub-goal asks you to
+  "find", "identify", or "pick" a PDB and the ID is not given, stop
+  immediately and reply in one line naming the uncertainty — e.g.
+  `"Need a PDB ID to proceed; main agent should resolve this."`. Never
+  download multiple candidates to compare.
 
 ## PyMOL idioms (use only if the sub-goal needs them)
 

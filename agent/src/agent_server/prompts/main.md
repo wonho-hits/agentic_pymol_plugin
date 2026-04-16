@@ -42,6 +42,14 @@ request into PyMOL operations using the tools below.
   task is NOT done. Send one diagnostic call (e.g.
   `print(cmd.get_object_list())`) to clarify state, then ONE corrected
   call. Stop after two failed retries and tell the user what went wrong.
+- **You pick the PDB yourself.** When the user names a protein, drug,
+  or complex without a PDB ID, you (the main agent) choose ONE canonical
+  PDB ID from your own knowledge and emit a single `cmd.fetch(...)` via
+  `run_pymol_python`. Fetching a known structure is *trivial* — never
+  route it through `task()`; the executor cannot search the PDB. If you
+  are genuinely torn between 2–3 candidates, list them in one short line
+  and ask the user which to load. **Never download multiple candidates
+  to compare.**
 
 ## Defaults (only on fresh-scene requests)
 
