@@ -329,11 +329,21 @@ class AgentClient:
         elif kind == protocol.EVENT_TOOL_CALL_PREVIEW:
             name = msg.payload.get("name", "?")
             preview = msg.payload.get("preview", "")
-            self._on_event(f"[{node}] → {name}({preview})")
+            if "\n" in preview:
+                body = "\n".join("  " + line for line in preview.splitlines())
+                self._on_event(f"[{node}] → {name}:\n{body}")
+            else:
+                self._on_event(f"[{node}] → {name}({preview})")
         elif kind == protocol.EVENT_TOOL_OUTPUT:
             name = msg.payload.get("name", "tool")
             text = msg.payload.get("text", "")
-            self._on_event(f"[{node}·{name}] {text}")
+            if text == "[OK, no stdout]":
+                self._on_event(f"[tool·{name}] OK")
+            elif "\n" in text:
+                body = "\n".join("  " + line for line in text.splitlines())
+                self._on_event(f"[tool·{name}]\n{body}")
+            else:
+                self._on_event(f"[tool·{name}] {text}")
         elif kind == protocol.EVENT_INFO:
             text = msg.payload.get("text", "")
             if text:

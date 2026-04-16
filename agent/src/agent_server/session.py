@@ -201,7 +201,7 @@ class AgentRunner:
                 if isinstance(args, dict):
                     code = args.get("code")
                     if isinstance(code, str):
-                        preview = _short(code, 200).replace("\n", " ⏎ ")
+                        preview = _short(code, 500)
                     else:
                         preview = _short(str(args), 200)
                 self._emit(
