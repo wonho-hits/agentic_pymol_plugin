@@ -27,8 +27,32 @@ from .session import AgentRunner
 VERSION = "0.1.0"
 DEFAULT_MODEL = "gemini-3-flash-preview"
 DEFAULT_RECURSION = 50
+DEFAULT_HISTORY_TURNS = 10
 
 log = logging.getLogger("agent_server")
+
+
+def _role_of(msg: Any) -> str:
+    """Return the role label of a message, whether it is a dict or a BaseMessage."""
+    if isinstance(msg, dict):
+        return str(msg.get("role") or msg.get("type") or "")
+    return str(getattr(msg, "type", "") or "")
+
+
+def _cap_history(history: list, max_turns: int) -> list:
+    """Trim history to the most recent ``max_turns`` user turns.
+
+    A turn starts at a human/user message and runs until the next one.
+    This keeps tool_call ↔ tool_result pairs intact within the window
+    since we slice at a human boundary, never mid-turn.
+    """
+    if max_turns <= 0:
+        return history
+    human_indices = [i for i, m in enumerate(history) if _role_of(m) in ("human", "user")]
+    if len(human_indices) <= max_turns:
+        return history
+    start = human_indices[-max_turns]
+    return history[start:]
 
 
 def _prepend_session_context(prompt: str, context: dict | None) -> str:
@@ -60,9 +84,12 @@ class Server:
         self._recursion = int(
             os.environ.get("AGENTIC_PYMOL_RECURSION", str(DEFAULT_RECURSION))
         )
+        self._history_turns = int(
+            os.environ.get("AGENTIC_PYMOL_HISTORY_TURNS", str(DEFAULT_HISTORY_TURNS))
+        )
 
         self._thread_id = uuid.uuid4().hex
-        self._history: list[dict] = []
+        self._history: list = []
 
         self._active_request: int | None = None
         self._active_bridge: RemoteToolBridge | None = None
@@ -168,7 +195,7 @@ class Server:
             annotated = _prepend_session_context(prompt, context)
             self._history.append({"role": "user", "content": annotated})
             final_text, new_history = runner.run(self._history, self._thread_id)
-            self._history = new_history
+            self._history = _cap_history(new_history, self._history_turns)
             self._write(protocol.done(request_id, final_text))
         except Exception as exc:
             self._write(

@@ -115,6 +115,17 @@ def _short_smart(text: str, head: int = 240, tail: int = 480) -> str:
     return f"{text[:head]} …(+{middle} chars)…\n{text[-tail:]}"
 
 
+def _last_ai_text(messages: list) -> str:
+    """Return the last non-empty text content from an AIMessage in ``messages``."""
+    for m in reversed(messages):
+        role = m.get("type") if isinstance(m, dict) else getattr(m, "type", None)
+        if role == "ai":
+            t = _text_of(m)
+            if t:
+                return t
+    return ""
+
+
 class AgentRunner:
     """One request. Builds a fresh deep agent graph, streams, emits events."""
 
@@ -138,33 +149,37 @@ class AgentRunner:
             subagents=[python_executor_spec(tools)],
         )
 
-    def run(self, messages: list[dict], thread_id: str) -> tuple[str, list[dict]]:
+    def run(self, messages: list, thread_id: str) -> tuple[str, list]:
         """Execute one turn. Returns ``(final_text, updated_messages)``.
 
-        ``messages`` is the conversation history in OpenAI chat format
-        (``{"role": "...", "content": "..."}``). The returned list is the
-        history extended with the assistant's reply (if any).
+        ``messages`` is the conversation history — either LangChain
+        ``BaseMessage`` objects or OpenAI-shaped dicts
+        (``{"role": "...", "content": "..."}``). The returned list extends
+        the input with every non-noise message emitted during this turn
+        (AIMessage with tool_calls, ToolMessage, final AIMessage), so that
+        subsequent turns see the full tool exchange instead of a bare text
+        summary.
         """
         config = {
             "configurable": {"thread_id": thread_id},
             "recursion_limit": self._recursion_limit,
         }
         inputs = {"messages": list(messages)}
-        history = list(messages)
 
-        final_state: dict | None = None
+        accumulated: list = []
+        seen_ids: set[str] = set()
+
         try:
             for chunk in self._agent.stream(inputs, config=config, stream_mode="updates"):
                 self._handle_chunk(chunk)
-                final_state = chunk
+                self._collect_messages(chunk, accumulated, seen_ids)
         except Exception as exc:
             self._emit("info", {"text": f"ERROR: {exc}"})
             raise RuntimeError(f"{exc}\n{traceback.format_exc()}") from exc
 
-        final_text = self._extract_final(final_state)
-        if final_text:
-            history.append({"role": "assistant", "content": final_text})
-        return final_text, history
+        final_text = _last_ai_text(accumulated)
+        new_history = list(messages) + accumulated
+        return final_text, new_history
 
     # ---- internals ---------------------------------------------------------
 
@@ -178,6 +193,24 @@ class AgentRunner:
                 continue
             for m in _unwrap_messages(update.get("messages")):
                 self._render_message(node_name, m)
+
+    def _collect_messages(
+        self, chunk: dict, out: list, seen_ids: set[str]
+    ) -> None:
+        if not isinstance(chunk, dict):
+            return
+        for node_name, update in chunk.items():
+            if _is_noise_node(node_name):
+                continue
+            if not isinstance(update, dict):
+                continue
+            for m in _unwrap_messages(update.get("messages")):
+                mid = m.get("id") if isinstance(m, dict) else getattr(m, "id", None)
+                if mid:
+                    if mid in seen_ids:
+                        continue
+                    seen_ids.add(mid)
+                out.append(m)
 
     def _render_message(self, node: str, msg: Any) -> None:
         role = msg.get("type") if isinstance(msg, dict) else getattr(msg, "type", None)
@@ -212,19 +245,3 @@ class AgentRunner:
         if text:
             self._emit("message", {"node": node, "text": _short(text)})
 
-    def _extract_final(self, final_state: dict | None) -> str:
-        if not isinstance(final_state, dict):
-            return ""
-        last_text = ""
-        for node_name, update in final_state.items():
-            if _is_noise_node(node_name):
-                continue
-            if not isinstance(update, dict):
-                continue
-            for m in _unwrap_messages(update.get("messages")):
-                role = m.get("type") if isinstance(m, dict) else getattr(m, "type", None)
-                if role == "ai":
-                    t = _text_of(m)
-                    if t:
-                        last_text = t
-        return last_text
