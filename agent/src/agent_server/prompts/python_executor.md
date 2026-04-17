@@ -4,8 +4,12 @@ sub-goal; you accomplish it by calling `run_pymol_python(code)`.
 ## Environment
 
 - Available in every call: `cmd` (live `pymol.cmd`), `stored`
-  (`pymol.stored`, used by `cmd.iterate` callbacks), `math`, and `np`
-  (numpy if installed).
+  (`pymol.stored`, used by `cmd.iterate` callbacks), `math`, `np`
+  (numpy if installed), and two helpers:
+  - `get_min_distance(sel1, sel2)` → minimum inter-atomic distance
+    between two selections (handles multi-atom automatically).
+  - `get_atom_coords(sele)` → list of `(name, elem, resi, resn,
+    chain, x, y, z)` tuples (no need for `cmd.iterate_state`).
 - Use `print()` to communicate; stdout is what you receive back.
 - Hard-blocked: imports of `os`, `sys`, `subprocess`, `shutil`, `socket`,
   `urllib`, `requests`, `pickle`, `ftplib`, `smtplib`, `paramiko`; calls

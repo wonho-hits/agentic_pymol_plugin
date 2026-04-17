@@ -26,15 +26,63 @@ _AA3_CODES = frozenset({
 })
 
 
+_ERROR_HINTS = [
+    (
+        "More than one atom found",
+        "cmd.get_distance requires each selection to match exactly 1 atom. "
+        "Loop over atoms with cmd.get_model(sele).atom and use "
+        "cmd.get_distance(f'/{obj}//{chain}/{resi}/{name}', other) instead.",
+    ),
+    (
+        "x/y/z only available in iterate_state",
+        "Use cmd.iterate_state(1, sele, expr) instead of cmd.iterate "
+        "to access coordinates.",
+    ),
+    (
+        "SyntaxError",
+        "cmd.iterate expressions must be single Python expressions — "
+        "no if/for statements. Use selection filters instead: "
+        "cmd.iterate('sele and elem FE', 'print(name)').",
+    ),
+]
+
+
+def _error_hint(tb: str) -> str:
+    for pattern, hint in _ERROR_HINTS:
+        if pattern in tb:
+            return hint
+    return ""
+
+
 def _build_namespace() -> dict:
     """Whitelisted globals for agent-generated code."""
     from pymol import cmd, stored  # type: ignore
     import math
 
+    def get_min_distance(sel1: str, sel2: str) -> float:
+        """Return the minimum inter-atomic distance between two selections."""
+        m1, m2 = cmd.get_model(sel1), cmd.get_model(sel2)
+        if not m1.atom or not m2.atom:
+            raise ValueError(f"empty selection: sel1={len(m1.atom)} sel2={len(m2.atom)} atoms")
+        return min(
+            sum((c1 - c2) ** 2 for c1, c2 in zip(a1.coord, a2.coord)) ** 0.5
+            for a1 in m1.atom
+            for a2 in m2.atom
+        )
+
+    def get_atom_coords(sele: str) -> list[tuple]:
+        """Return [(name, elem, resi, resn, chain, x, y, z), ...] for *sele*."""
+        return [
+            (a.name, a.symbol, a.resi, a.resn, a.chain, *a.coord)
+            for a in cmd.get_model(sele).atom
+        ]
+
     ns: dict = {
         "cmd": cmd,
         "stored": stored,
         "math": math,
+        "get_min_distance": get_min_distance,
+        "get_atom_coords": get_atom_coords,
     }
     try:
         import numpy as np  # type: ignore
@@ -78,10 +126,12 @@ def run_pymol_python(code: str) -> tuple[bool, str]:
         except Exception:
             captured = buf.getvalue()
             tb = traceback.format_exc()
+            hint = _error_hint(tb)
             output = (
                 "[ERROR] code raised an exception:\n"
                 + (captured + "\n" if captured else "")
                 + tb
+                + (f"\n[HINT] {hint}" if hint else "")
             )
 
     if result.warnings:

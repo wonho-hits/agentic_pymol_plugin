@@ -153,9 +153,14 @@ class RemoteToolBridge:
             """Execute Python code inside the running PyMOL session.
 
             Available names: ``cmd`` (pymol.cmd), ``stored`` (pymol.stored),
-            ``math``, ``np`` (numpy if installed). Imports of os / subprocess /
-            shutil / sys / socket / urllib / requests are blocked.
-            ``cmd.reinitialize()``, ``cmd.delete('all')``, ``cmd.quit()`` are blocked.
+            ``math``, ``np`` (numpy if installed), plus two helpers:
+            ``get_min_distance(sel1, sel2)`` (minimum distance, handles
+            multi-atom selections) and ``get_atom_coords(sele)`` (returns
+            list of (name, elem, resi, resn, chain, x, y, z) tuples).
+
+            Imports of os / subprocess / shutil / sys / socket / urllib /
+            requests are blocked. ``cmd.reinitialize()``,
+            ``cmd.delete('all')``, ``cmd.quit()`` are blocked.
             ``cmd.fetch`` and other normal PyMOL commands are allowed.
 
             Use ``print(...)`` to surface values — the tool returns captured stdout.
