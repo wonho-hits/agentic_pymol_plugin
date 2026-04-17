@@ -91,8 +91,19 @@ class Server:
         self._thread_id = uuid.uuid4().hex
         self._history: list = []
 
+        # Build the agent graph ONCE — reused across all requests.
+        # The bridge and emit callback are swapped per-request via reset().
+        self._bridge = RemoteToolBridge(
+            send_tool_call=lambda *a: None,  # replaced per-request
+        )
+        self._runner = AgentRunner(
+            model_name=self._model,
+            tools=self._bridge.build_tools(),
+            emit=lambda *a, **k: None,  # replaced per-request
+            recursion_limit=self._recursion,
+        )
+
         self._active_request: int | None = None
-        self._active_bridge: RemoteToolBridge | None = None
         self._active_lock = threading.Lock()
         self._stop_event = threading.Event()
 
@@ -161,18 +172,11 @@ class Server:
                     )
                 )
                 return
-
-            bridge = RemoteToolBridge(
-                send_tool_call=lambda call_id, name, args: self._send_tool_call(
-                    request_id, call_id, name, args
-                )
-            )
             self._active_request = request_id
-            self._active_bridge = bridge
 
         thread = threading.Thread(
             target=self._run_request,
-            args=(request_id, prompt, context, bridge),
+            args=(request_id, prompt, context),
             daemon=True,
             name=f"agent-request-{request_id}",
         )
@@ -183,22 +187,23 @@ class Server:
         request_id: int,
         prompt: str,
         context: dict | None,
-        bridge: RemoteToolBridge,
     ) -> None:
         import time as _time
 
         log.info("request #%d started — %r", request_id, prompt[:120])
         t0 = _time.monotonic()
         try:
-            runner = AgentRunner(
-                model_name=self._model,
-                tools=bridge.build_tools(),
-                emit=lambda kind, fields: self._emit_event(request_id, kind, fields),
-                recursion_limit=self._recursion,
+            # Swap bridge sender and emit callback for this request.
+            self._bridge.reset(
+                send_tool_call=lambda call_id, name, args: self._send_tool_call(
+                    request_id, call_id, name, args
+                )
             )
+            self._runner._emit = lambda kind, fields: self._emit_event(request_id, kind, fields)
+
             annotated = _prepend_session_context(prompt, context)
             self._history.append({"role": "user", "content": annotated})
-            final_text, new_history = runner.run(self._history, self._thread_id)
+            final_text, new_history = self._runner.run(self._history, self._thread_id)
             prev_turns = len([m for m in self._history if _role_of(m) in ("human", "user")])
             self._history = _cap_history(new_history, self._history_turns)
             new_turns = len([m for m in self._history if _role_of(m) in ("human", "user")])
@@ -219,7 +224,6 @@ class Server:
             with self._active_lock:
                 if self._active_request == request_id:
                     self._active_request = None
-                    self._active_bridge = None
 
     # ---- callbacks wired into the session ---------------------------------
 
@@ -242,17 +246,15 @@ class Server:
         result = str(msg.payload.get("result", ""))
 
         with self._active_lock:
-            bridge = self._active_bridge
-            if bridge is None or self._active_request != msg.id:
+            if self._active_request != msg.id:
                 return
-        bridge.deliver_result(call_id, ok, result)
+        self._bridge.deliver_result(call_id, ok, result)
 
     def _handle_cancel(self, msg: protocol.Message) -> None:
         with self._active_lock:
-            bridge = self._active_bridge
-            if bridge is None or self._active_request != msg.id:
+            if self._active_request != msg.id:
                 return
-        bridge.cancel()
+        self._bridge.cancel()
 
 
 def main() -> int:

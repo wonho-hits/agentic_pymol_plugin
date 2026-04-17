@@ -132,6 +132,13 @@ class RemoteToolBridge:
         pending.result = result
         pending.event.set()
 
+    def reset(self, send_tool_call: ToolSender) -> None:
+        """Prepare for a new request — clear pending state, set new sender."""
+        with self._lock:
+            self._send = send_tool_call
+            self._pending.clear()
+            self._cancelled = False
+
     def cancel(self) -> None:
         """Unblock any in-flight tool calls with a cancellation marker."""
         with self._lock:
