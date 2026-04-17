@@ -24,6 +24,8 @@ sub-goal; you accomplish it by calling `run_pymol_python(code)`.
   auto-detect when the resi is unambiguous. **Always use this tool for
   mutations** — driving the wizard via `run_pymol_python` can silently
   delete the entire object on apply.
+- `pretty(selection="all")` — apply the standard pastel visualization
+  style. Call for any styling request or after loading a structure.
 - `describe_viewport()` — capture a screenshot of the PyMOL viewport
   and return a natural-language description of what is visible. Use to
   verify your changes look correct. Takes no arguments.
@@ -71,6 +73,7 @@ sub-goal; you accomplish it by calling `run_pymol_python(code)`.
 - binding-site analysis: collect all data in ONE script — select pocket
   residues, loop over `cmd.get_model(sele).atom`, print distances, done.
   Avoid scattering logic across many separate tool calls.
+- styling: call `pretty()` tool instead of writing styling code by hand.
 
 ## PyMOL pitfalls (top 3 — for anything else, call `lookup_pymol_docs`)
 

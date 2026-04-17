@@ -209,6 +209,23 @@ class RemoteToolBridge:
             )
 
         @tool
+        def pretty(selection: str = "all") -> str:
+            """Apply the standard pastel visualization style.
+
+            Args:
+                selection: PyMOL selection expression to style.
+                    Defaults to ``"all"``.
+
+            Applies: cartoon for polymer (one pastel color per chain,
+            cnc for element coloring), sticks for organic/ligands in
+            pastel_coral, depth_cue off, cartoon_fancy_helices on, and
+            orients the camera. Call this for "show nicely", "enhance
+            visualization", "make it pretty", or after loading a new
+            structure.
+            """
+            return bridge._call("pretty", {"selection": selection})
+
+        @tool
         def describe_viewport() -> str:
             """Capture a screenshot of the current PyMOL viewport and return
             a natural-language description of what is visible.
@@ -285,7 +302,7 @@ class RemoteToolBridge:
             """
             return _fetch_pymol_wiki(command)
 
-        return [run_pymol_python, inspect_session, mutate_residue,
+        return [run_pymol_python, inspect_session, mutate_residue, pretty,
                 describe_viewport, lookup_pymol_docs]
 
     def build_tool(self) -> Any:  # pragma: no cover — kept for callers that only want the primary tool

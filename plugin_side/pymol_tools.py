@@ -301,6 +301,94 @@ def _close_wizard_and_cleanup(cmd) -> None:
             pass
 
 
+_PASTEL_COLORS = {
+    "pastel_blue":     [0.68, 0.78, 0.90],
+    "pastel_pink":     [0.95, 0.75, 0.78],
+    "pastel_green":    [0.70, 0.88, 0.72],
+    "pastel_lavender": [0.82, 0.75, 0.92],
+    "pastel_peach":    [0.95, 0.82, 0.68],
+    "pastel_mint":     [0.72, 0.90, 0.85],
+    "pastel_yellow":   [0.98, 0.92, 0.65],
+    "pastel_coral":    [0.95, 0.72, 0.65],
+    "pastel_cyan":     [0.72, 0.88, 0.92],
+    "pastel_lilac":    [0.88, 0.75, 0.88],
+}
+
+_CHAIN_COLORS = [
+    "gray80",
+    "pastel_blue",
+    "pastel_pink",
+    "pastel_green",
+    "pastel_lavender",
+    "pastel_peach",
+    "pastel_mint",
+    "pastel_yellow",
+    "pastel_coral",
+    "pastel_cyan",
+    "pastel_lilac",
+]
+
+
+def pretty(selection: str = "all") -> tuple[bool, str]:
+    """Apply the standard pastel visualization style.
+
+    Polymer → cartoon with one pastel color per chain (cnc to keep
+    element coloring on heteroatoms). Organic/ligands → sticks in
+    pastel_coral + cnc. Rendering settings: depth_cue off,
+    cartoon_fancy_helices on, cartoon_side_chain_helper on.
+    """
+    try:
+        from pymol import cmd  # type: ignore
+    except Exception as exc:
+        return True, f"[ERROR] pymol unavailable: {exc}"
+
+    sel = str(selection).strip() or "all"
+
+    buf = io.StringIO()
+    with _EXEC_LOCK:
+        try:
+            with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
+                for name, rgb in _PASTEL_COLORS.items():
+                    cmd.set_color(name, rgb)
+
+                cmd.show("cartoon", f"polymer and {sel}")
+                cmd.hide("lines", f"polymer and {sel}")
+                cmd.show("sticks", f"organic and {sel}")
+
+                objects = cmd.get_object_list(f"polymer and {sel}") or []
+                color_idx = 0
+                for obj in objects:
+                    chains = cmd.get_chains(f"polymer and {obj} and {sel}") or []
+                    if len(chains) <= 1:
+                        c = _CHAIN_COLORS[color_idx % len(_CHAIN_COLORS)]
+                        cmd.color(c, f"polymer and {obj}")
+                        cmd.util.cnc(f"polymer and {obj}")
+                        color_idx += 1
+                    else:
+                        for chain in chains:
+                            c = _CHAIN_COLORS[color_idx % len(_CHAIN_COLORS)]
+                            cmd.color(c, f"polymer and {obj} and chain {chain}")
+                            cmd.util.cnc(f"polymer and {obj} and chain {chain}")
+                            color_idx += 1
+
+                cmd.color("pastel_coral", f"organic and {sel}")
+                cmd.util.cnc(f"organic and {sel}")
+
+                cmd.set("depth_cue", 0)
+                cmd.set("ray_shadows", "off")
+                cmd.set("cartoon_fancy_helices", "on")
+                cmd.set("cartoon_side_chain_helper", "on")
+
+                cmd.orient(sel)
+        except Exception:
+            tb = traceback.format_exc()
+            return True, f"[ERROR] pretty failed:\n{buf.getvalue()}\n{tb}"
+
+    stdout = buf.getvalue().strip()
+    n_obj = len(objects) if 'objects' in dir() else 0
+    return True, f"[OK] applied pastel styling to {n_obj} object(s){': ' + stdout if stdout else ''}"
+
+
 def capture_viewport(
     width: int = 800, height: int = 600
 ) -> tuple[bool, str]:
@@ -338,6 +426,7 @@ TOOL_HANDLERS = {
         resi=str(args.get("resi", "")),
         target_aa=str(args.get("target_aa", "")),
     ),
+    "pretty": lambda args: pretty(selection=str(args.get("selection", "all"))),
     "capture_viewport": lambda args: capture_viewport(
         width=int(args.get("width", 800)),
         height=int(args.get("height", 600)),
