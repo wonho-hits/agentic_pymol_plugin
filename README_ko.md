@@ -6,7 +6,7 @@ PyMOL을 자연어로 조작하세요. PyMOL 콘솔에 요청을 입력하면 Ge
 DeepAgent가 계획을 세우고, 필요한 PyMOL Python 코드를 직접 작성·실행해
 원하는 장면을 만들어 냅니다.
 
-<video src="assets/demo.mov" controls width="100%"></video>
+https://github.com/user-attachments/assets/30cf4690-fcac-4e4a-88c9-0d40a9d23f84
 
 ```text
 PyMOL> ask 2wyk 리간드-단백질 interface를 stick으로 보여줘
