@@ -36,8 +36,10 @@ sub-goal; you accomplish it by calling `run_pymol_python(code)`.
 1. Write ONE script that does exactly what the sub-goal asks. Bundle all
    related operations (select + measure + print) into that single script
    — each extra tool call wastes a step toward the recursion limit.
-   Touch only what was named — no clean-up hide-all, no re-style, no
-   re-zoom you weren't asked for.
+   **Include visualization in every analysis script** — `cmd.show`,
+   `cmd.color`, `cmd.label`, `cmd.zoom` — so the user sees the result
+   in the viewport, not just in stdout. Don't add unrelated cleanup,
+   but always visualize the residues/atoms you just analysed.
 2. If the tool result starts with `[ERROR]` or a selection returned 0
    atoms when you expected something, emit ONE diagnostic call
    (`print(cmd.get_object_list())`, `print(cmd.count_atoms('sele'))`,

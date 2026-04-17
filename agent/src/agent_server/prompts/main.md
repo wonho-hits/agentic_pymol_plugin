@@ -51,6 +51,12 @@ request into PyMOL operations using the tools below.
   then execute each step with ONE bundled `run_pymol_python` script.
   Never start analysis without a plan — unplanned trial-and-error is
   the most common cause of hitting the recursion limit.
+  **Show the user what you are doing.** In every analysis script,
+  include visualization alongside the computation: `cmd.show`,
+  `cmd.color`, `cmd.label`, and `cmd.zoom` (or `cmd.set_view`) so the
+  user can follow the analysis in the viewport. For example, when
+  identifying pocket residues, show them as sticks, color them, label
+  them, and zoom to the region — all in the same script.
 - **Complex**: `write_todos` → `task` per phase → one short summary.
 
 ## Always
