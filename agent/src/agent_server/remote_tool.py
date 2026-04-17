@@ -25,6 +25,74 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 
 log = logging.getLogger(__name__)
 
+_WIKI_MAX_CHARS = 4000
+
+
+class _WikiTextExtractor:
+    """Extract readable text from the ``#mw-content-text`` div of a
+    MediaWiki page using only the stdlib ``html.parser``."""
+
+    def __init__(self) -> None:
+        from html.parser import HTMLParser
+
+        class _Parser(HTMLParser):
+            def __init__(self_inner) -> None:
+                super().__init__()
+                self_inner.in_content = False
+                self_inner.skip = False
+                self_inner.texts: list[str] = []
+                self_inner._skip_tags = {"script", "style", "nav", "footer", "header"}
+
+            def handle_starttag(self_inner, tag, attrs):
+                if dict(attrs).get("id") == "mw-content-text":
+                    self_inner.in_content = True
+                if tag in self_inner._skip_tags:
+                    self_inner.skip = True
+
+            def handle_endtag(self_inner, tag):
+                if tag in self_inner._skip_tags:
+                    self_inner.skip = False
+
+            def handle_data(self_inner, data):
+                if self_inner.in_content and not self_inner.skip:
+                    t = data.strip()
+                    if t:
+                        self_inner.texts.append(t)
+
+        self._parser_cls = _Parser
+
+    def extract(self, html: str) -> str:
+        p = self._parser_cls()
+        p.feed(html)
+        return "\n".join(p.texts)
+
+
+_wiki_extractor = _WikiTextExtractor()
+
+
+def _fetch_pymol_wiki(command: str) -> str:
+    """Fetch and extract text from a PyMOL Wiki page."""
+    import urllib.request
+    import urllib.error
+
+    command = command.strip().capitalize()
+    url = f"https://pymolwiki.org/index.php/{command}"
+    req = urllib.request.Request(url, headers={"User-Agent": "AgenticPyMOL/1.0"})
+    try:
+        resp = urllib.request.urlopen(req, timeout=10)
+        html = resp.read().decode("utf-8", errors="replace")
+    except urllib.error.HTTPError as exc:
+        return f"[ERROR] {url} returned HTTP {exc.code}"
+    except Exception as exc:
+        return f"[ERROR] failed to fetch {url}: {exc}"
+
+    text = _wiki_extractor.extract(html)
+    if not text:
+        return f"[ERROR] no content found at {url}"
+    if len(text) > _WIKI_MAX_CHARS:
+        text = text[:_WIKI_MAX_CHARS] + f"\n…(truncated, {len(text) - _WIKI_MAX_CHARS} more chars)"
+    return text
+
 
 ToolSender = Callable[[str, str, dict], None]
 """Callable injected by the server: ``sender(call_id, tool_name, args) -> None``."""
@@ -200,7 +268,25 @@ class RemoteToolBridge:
                 log.exception("vision call failed")
                 return f"[ERROR] vision model call failed: {exc}"
 
-        return [run_pymol_python, inspect_session, mutate_residue, describe_viewport]
+        @tool
+        def lookup_pymol_docs(command: str) -> str:
+            """Look up a PyMOL command on the PyMOL Wiki and return its
+            documentation as plain text.
+
+            Args:
+                command: PyMOL command or function name, e.g.
+                    ``"iterate"``, ``"get_distance"``, ``"select"``,
+                    ``"align"``, ``"pseudoatom"``.
+
+            Call this **before** writing code when you are unsure about
+            a command's exact syntax, accepted arguments, or
+            limitations. One wiki lookup is far cheaper than an error →
+            retry cycle. The result is truncated to ~4 000 characters.
+            """
+            return _fetch_pymol_wiki(command)
+
+        return [run_pymol_python, inspect_session, mutate_residue,
+                describe_viewport, lookup_pymol_docs]
 
     def build_tool(self) -> Any:  # pragma: no cover — kept for callers that only want the primary tool
         """Legacy alias: returns just ``run_pymol_python``."""

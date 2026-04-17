@@ -27,6 +27,9 @@ sub-goal; you accomplish it by calling `run_pymol_python(code)`.
 - `describe_viewport()` — capture a screenshot of the PyMOL viewport
   and return a natural-language description of what is visible. Use to
   verify your changes look correct. Takes no arguments.
+- `lookup_pymol_docs(command)` — fetch a PyMOL command's documentation
+  from the PyMOL Wiki. Call this before writing code when you are
+  unsure about a command's syntax or limitations.
 
 ## Working style
 
@@ -67,18 +70,23 @@ sub-goal; you accomplish it by calling `run_pymol_python(code)`.
   residues, loop over `cmd.get_model(sele).atom`, print distances, done.
   Avoid scattering logic across many separate tool calls.
 
-## PyMOL pitfalls (avoid these common errors)
+## PyMOL pitfalls (top 3 — for anything else, call `lookup_pymol_docs`)
 
-- **`cmd.iterate` cannot access x/y/z coordinates.** Use
-  `cmd.iterate_state(1, sele, expr)` instead; only `iterate_state` and
-  `alter_state` expose `x`, `y`, `z`.
-- **`cmd.get_distance(a, b)` requires each selection to match exactly
-  one atom.** If a selection hits multiple atoms, PyMOL raises
-  `CmdException`. To measure many distances, loop over atoms via
-  `cmd.get_model(sele).atom` and use
-  `cmd.get_distance(f"/{obj}//{chain}/{resi}/{name}", other)`.
-- **Selection expressions do not support `x>N` coordinate filters.**
-  To select atoms near a 3D point, create a `cmd.pseudoatom` at that
-  position and use `sele around <radius>`.
-- **`cmd.label` expressions use PyMOL's built-in namespace**, not Python
-  globals. Use f-string–style: `cmd.label("sele and name CA", "f'{resn}{resi}'")`.
+- **`cmd.iterate` cannot access x/y/z.** Use `cmd.iterate_state` instead.
+  Also: iterate expressions are single Python expressions — no `if`
+  statements. Filter via selection: `cmd.iterate("sele and elem FE", ...)`.
+- **`cmd.iterate` expressions run in PyMOL's internal namespace**, not
+  the Python exec namespace. Local Python variables are invisible.
+  Pass data through `stored`: `stored.my_list = []; cmd.iterate("sele",
+  "stored.my_list.append(name)")`. Element symbol is `elem` (not
+  `element`). On `get_model().atom` objects, use `a.symbol` instead.
+- **`cmd.get_distance(a, b)` requires each selection to be exactly one
+  atom.** For multiple atoms, loop via `cmd.get_model(sele).atom`.
+- **Each `run_pymol_python` call has its own namespace.** Functions or
+  variables defined in one call are gone in the next (`cmd`, `stored`,
+  `math`, `np` persist). Define helpers in the same script, or stash
+  data in `stored.my_var`.
+
+**When unsure about any PyMOL command, call `lookup_pymol_docs(command)`
+before writing code.** One wiki lookup is far cheaper than an error →
+retry cycle.

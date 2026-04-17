@@ -301,7 +301,7 @@ class AgentClient:
         if msg.type == protocol.MSG_DONE:
             final = str(msg.payload.get("final", "") or "")
             if final:
-                self._on_event(f"[agent] ✓ {_short(final, 400)}")
+                self._on_event(f"[agent] ✓ {final}")
             else:
                 self._on_event("[agent] done")
             self._current_request = None
