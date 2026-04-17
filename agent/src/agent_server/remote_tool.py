@@ -317,6 +317,12 @@ class RemoteToolBridge:
     # ---- internals ---------------------------------------------------------
 
     def _call(self, name: str, args: dict) -> str:
+        import time as _time
+
+        args_summary = str(args)[:120] if args else ""
+        log.info("→ %s(%s)", name, args_summary)
+        t0 = _time.monotonic()
+
         call_id = uuid.uuid4().hex[:12]
         pending = _PendingCall()
         with self._lock:
@@ -334,10 +340,15 @@ class RemoteToolBridge:
         if not pending.event.wait(self._timeout):
             with self._lock:
                 self._pending.pop(call_id, None)
+            log.info("← %s TIMEOUT (%.1fs)", name, _time.monotonic() - t0)
             return f"[TOOL-BRIDGE-TIMEOUT] no result in {self._timeout:.0f}s"
 
         with self._lock:
             self._pending.pop(call_id, None)
+
+        elapsed = _time.monotonic() - t0
+        status = "OK" if pending.ok else "FAIL"
+        log.info("← %s %s (%d chars, %.1fs)", name, status, len(pending.result), elapsed)
 
         if not pending.ok:
             return pending.result or "[TOOL-BRIDGE-ERROR] plugin reported failure"

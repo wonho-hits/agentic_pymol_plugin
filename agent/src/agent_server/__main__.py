@@ -185,6 +185,10 @@ class Server:
         context: dict | None,
         bridge: RemoteToolBridge,
     ) -> None:
+        import time as _time
+
+        log.info("request #%d started — %r", request_id, prompt[:120])
+        t0 = _time.monotonic()
         try:
             runner = AgentRunner(
                 model_name=self._model,
@@ -195,7 +199,13 @@ class Server:
             annotated = _prepend_session_context(prompt, context)
             self._history.append({"role": "user", "content": annotated})
             final_text, new_history = runner.run(self._history, self._thread_id)
+            prev_turns = len([m for m in self._history if _role_of(m) in ("human", "user")])
             self._history = _cap_history(new_history, self._history_turns)
+            new_turns = len([m for m in self._history if _role_of(m) in ("human", "user")])
+            if prev_turns > new_turns:
+                log.info("history capped %d → %d turns", prev_turns, new_turns)
+            elapsed = _time.monotonic() - t0
+            log.info("request #%d done (%.1fs)", request_id, elapsed)
             self._write(protocol.done(request_id, final_text))
         except Exception as exc:
             self._write(
