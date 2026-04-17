@@ -329,7 +329,9 @@ class AgentClient:
         elif kind == protocol.EVENT_TOOL_CALL_PREVIEW:
             name = msg.payload.get("name", "?")
             preview = msg.payload.get("preview", "")
-            if "\n" in preview:
+            if name == "write_todos":
+                self._on_event(self._format_todos_preview(node, preview))
+            elif "\n" in preview:
                 body = "\n".join("  " + line for line in preview.splitlines())
                 self._on_event(f"[{node}] → {name}:\n{body}")
             else:
@@ -337,7 +339,9 @@ class AgentClient:
         elif kind == protocol.EVENT_TOOL_OUTPUT:
             name = msg.payload.get("name", "tool")
             text = msg.payload.get("text", "")
-            if text == "[OK, no stdout]":
+            if name == "write_todos":
+                self._on_event(self._format_todos_output(text))
+            elif text == "[OK, no stdout]":
                 self._on_event(f"[tool·{name}] OK")
             elif "\n" in text:
                 body = "\n".join("  " + line for line in text.splitlines())
@@ -348,6 +352,49 @@ class AgentClient:
             text = msg.payload.get("text", "")
             if text:
                 self._on_event(f"[agent] {text}")
+
+    @staticmethod
+    def _format_todos_preview(node: str, preview: str) -> str:
+        """Render a write_todos tool call as a readable checklist."""
+        _STATUS_ICONS = {"in_progress": "▶", "completed": "✓"}
+        try:
+            import ast
+            data = ast.literal_eval(preview)
+            todos = data.get("todos", []) if isinstance(data, dict) else data
+            if not isinstance(todos, list):
+                raise ValueError
+        except Exception:
+            return f"[{node}] → write_todos({_short(preview, 120)})"
+        lines = [f"[{node}] → write_todos:"]
+        for t in todos:
+            if isinstance(t, dict):
+                icon = _STATUS_ICONS.get(t.get("status", ""), "☐")
+                lines.append(f"  {icon} {t.get('content', '?')}")
+        return "\n".join(lines)
+
+    @staticmethod
+    def _format_todos_output(text: str) -> str:
+        """Render write_todos result as a short summary."""
+        _STATUS_ICONS = {"in_progress": "▶", "completed": "✓"}
+        try:
+            prefix = "Updated todo list to "
+            if text.startswith(prefix):
+                import ast
+                todos = ast.literal_eval(text[len(prefix):])
+                if isinstance(todos, list):
+                    counts = {}
+                    for t in todos:
+                        s = t.get("status", "pending") if isinstance(t, dict) else "pending"
+                        counts[s] = counts.get(s, 0) + 1
+                    parts = []
+                    for s in ("completed", "in_progress", "pending"):
+                        if s in counts:
+                            icon = _STATUS_ICONS.get(s, "☐")
+                            parts.append(f"{icon}{counts[s]}")
+                    return f"[tool·write_todos] {' '.join(parts)}"
+        except Exception:
+            pass
+        return f"[tool·write_todos] OK"
 
     def _handle_tool_call(self, msg: protocol.Message) -> None:
         request_id = msg.id
