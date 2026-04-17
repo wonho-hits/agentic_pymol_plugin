@@ -374,7 +374,7 @@ class AgentClient:
 
     @staticmethod
     def _format_todos_output(text: str) -> str:
-        """Render write_todos result as a short summary."""
+        """Render write_todos result as a readable checklist."""
         _STATUS_ICONS = {"in_progress": "▶", "completed": "✓"}
         try:
             prefix = "Updated todo list to "
@@ -382,16 +382,12 @@ class AgentClient:
                 import ast
                 todos = ast.literal_eval(text[len(prefix):])
                 if isinstance(todos, list):
-                    counts = {}
+                    lines = ["[tool·write_todos]"]
                     for t in todos:
-                        s = t.get("status", "pending") if isinstance(t, dict) else "pending"
-                        counts[s] = counts.get(s, 0) + 1
-                    parts = []
-                    for s in ("completed", "in_progress", "pending"):
-                        if s in counts:
-                            icon = _STATUS_ICONS.get(s, "☐")
-                            parts.append(f"{icon}{counts[s]}")
-                    return f"[tool·write_todos] {' '.join(parts)}"
+                        if isinstance(t, dict):
+                            icon = _STATUS_ICONS.get(t.get("status", ""), "☐")
+                            lines.append(f"  {icon} {t.get('content', '?')}")
+                    return "\n".join(lines)
         except Exception:
             pass
         return f"[tool·write_todos] OK"
