@@ -476,4 +476,4 @@ Please:
 
 ## License
 
-(Fill in with the project's license of choice.)
+[MIT](./LICENSE)

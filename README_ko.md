@@ -471,4 +471,4 @@ export AGENTIC_PYMOL_LOG=DEBUG
 
 ## 라이선스
 
-(프로젝트 라이선스에 맞게 채워 넣으세요.)
+[MIT](./LICENSE)
