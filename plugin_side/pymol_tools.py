@@ -29,14 +29,21 @@ _AA3_CODES = frozenset({
 _ERROR_HINTS = [
     (
         "More than one atom found",
-        "cmd.get_distance requires each selection to match exactly 1 atom. "
-        "Loop over atoms with cmd.get_model(sele).atom and use "
-        "cmd.get_distance(f'/{obj}//{chain}/{resi}/{name}', other) instead.",
+        "Use get_min_distance(sel1, sel2) instead of cmd.get_distance "
+        "— it handles multi-atom selections automatically.",
     ),
     (
         "x/y/z only available in iterate_state",
-        "Use cmd.iterate_state(1, sele, expr) instead of cmd.iterate "
-        "to access coordinates.",
+        "Use get_atom_coords(sele) instead — it returns "
+        "[(name, elem, resi, resn, chain, x, y, z), ...] without "
+        "needing cmd.iterate_state.",
+    ),
+    (
+        "NameError",
+        "Variables from Python (including np, math, and your own) are "
+        "NOT available inside cmd.iterate/iterate_state expressions. "
+        "Use get_atom_coords(sele) to get coordinates as a Python list, "
+        "then process with np/math in normal Python code.",
     ),
     (
         "SyntaxError",
