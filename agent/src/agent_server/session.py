@@ -8,6 +8,7 @@ them as ndjson messages.
 """
 from __future__ import annotations
 
+import logging
 import traceback
 from collections.abc import Callable
 from pathlib import Path
@@ -17,6 +18,10 @@ from deepagents import create_deep_agent
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 from .subagents import python_executor_spec
+
+log = logging.getLogger(__name__)
+
+_VERBOSE_TOOLS = frozenset({"describe_viewport", "capture_viewport"})
 
 _PROMPT_DIR = Path(__file__).resolve().parent / "prompts"
 _MAX_EVENT_LEN = 600
@@ -220,10 +225,17 @@ class AgentRunner:
         if role == "tool":
             name = msg.get("name") if isinstance(msg, dict) else getattr(msg, "name", "tool")
             if text:
-                self._emit(
-                    "tool_output",
-                    {"node": node, "name": name, "text": _short_smart(text)},
-                )
+                if name in _VERBOSE_TOOLS:
+                    log.debug("tool_output [%s]: %s", name, _short(text, 200))
+                    self._emit(
+                        "tool_output",
+                        {"node": node, "name": name, "text": f"({len(text)} chars received)"},
+                    )
+                else:
+                    self._emit(
+                        "tool_output",
+                        {"node": node, "name": name, "text": _short_smart(text)},
+                    )
             return
 
         if tool_calls:

@@ -30,9 +30,11 @@ sub-goal; you accomplish it by calling `run_pymol_python(code)`.
 
 ## Working style
 
-1. Write ONE script that does exactly what the sub-goal asks. Touch only
-   what was named — no clean-up hide-all, no re-style, no re-zoom you
-   weren't asked for.
+1. Write ONE script that does exactly what the sub-goal asks. Bundle all
+   related operations (select + measure + print) into that single script
+   — each extra tool call wastes a step toward the recursion limit.
+   Touch only what was named — no clean-up hide-all, no re-style, no
+   re-zoom you weren't asked for.
 2. If the tool result starts with `[ERROR]` or a selection returned 0
    atoms when you expected something, emit ONE diagnostic call
    (`print(cmd.get_object_list())`, `print(cmd.count_atoms('sele'))`,
@@ -61,3 +63,22 @@ sub-goal; you accomplish it by calling `run_pymol_python(code)`.
 - color by element keeping carbons: `cmd.util.cnc('sele')` (object colour)
   or `cmd.util.cbaw('sele')` (white carbons)
 - replace existing reps in one shot: `cmd.show_as('sticks', 'sele')`
+- binding-site analysis: collect all data in ONE script — select pocket
+  residues, loop over `cmd.get_model(sele).atom`, print distances, done.
+  Avoid scattering logic across many separate tool calls.
+
+## PyMOL pitfalls (avoid these common errors)
+
+- **`cmd.iterate` cannot access x/y/z coordinates.** Use
+  `cmd.iterate_state(1, sele, expr)` instead; only `iterate_state` and
+  `alter_state` expose `x`, `y`, `z`.
+- **`cmd.get_distance(a, b)` requires each selection to match exactly
+  one atom.** If a selection hits multiple atoms, PyMOL raises
+  `CmdException`. To measure many distances, loop over atoms via
+  `cmd.get_model(sele).atom` and use
+  `cmd.get_distance(f"/{obj}//{chain}/{resi}/{name}", other)`.
+- **Selection expressions do not support `x>N` coordinate filters.**
+  To select atoms near a 3D point, create a `cmd.pseudoatom` at that
+  position and use `sele around <radius>`.
+- **`cmd.label` expressions use PyMOL's built-in namespace**, not Python
+  globals. Use f-string–style: `cmd.label("sele and name CA", "f'{resn}{resi}'")`.

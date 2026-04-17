@@ -188,7 +188,14 @@ class RemoteToolBridge:
                     },
                 ])
                 response = vision_llm.invoke([msg])
-                return str(response.content)
+                content = response.content
+                if isinstance(content, list):
+                    parts = [
+                        p["text"] for p in content
+                        if isinstance(p, dict) and p.get("type") == "text"
+                    ]
+                    return "\n".join(parts) if parts else str(content)
+                return str(content)
             except Exception as exc:
                 log.exception("vision call failed")
                 return f"[ERROR] vision model call failed: {exc}"
