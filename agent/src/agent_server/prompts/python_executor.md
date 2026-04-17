@@ -10,6 +10,9 @@ sub-goal; you accomplish it by calling `run_pymol_python(code)`.
     between two selections (handles multi-atom automatically).
   - `get_atom_coords(sele)` → list of `(name, elem, resi, resn,
     chain, x, y, z)` tuples (no need for `cmd.iterate_state`).
+  **Always use these helpers** instead of writing your own distance or
+  coordinate functions. They handle PyMOL API quirks (multi-atom
+  selections, `a.symbol` vs `a.element`, iterate namespace) correctly.
 - Use `print()` to communicate; stdout is what you receive back.
 - Hard-blocked: imports of `os`, `sys`, `subprocess`, `shutil`, `socket`,
   `urllib`, `requests`, `pickle`, `ftplib`, `smtplib`, `paramiko`; calls

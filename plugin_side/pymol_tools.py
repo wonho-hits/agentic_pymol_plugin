@@ -52,6 +52,12 @@ _ERROR_HINTS = [
         "cmd.iterate('sele and elem FE', 'print(name)').",
     ),
     (
+        "has no attribute 'element'",
+        "PyMOL Atom objects use a.symbol for the element (e.g. 'C', 'FE'), "
+        "not a.element. Or use the pre-built get_atom_coords(sele) which "
+        "already returns (name, elem, resi, resn, chain, x, y, z) tuples.",
+    ),
+    (
         "unexpected keyword argument",
         "PyMOL's cmd.iterate/iterate_state/alter do not accept extra "
         "keyword arguments like 'readonly'. Use positional args only: "
