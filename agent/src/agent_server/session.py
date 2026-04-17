@@ -131,6 +131,33 @@ def _last_ai_text(messages: list) -> str:
     return ""
 
 
+def _unpack_stream_event(event: Any) -> tuple[tuple, dict]:
+    """Normalise a stream event into ``(namespace, chunk_dict)``.
+
+    With ``subgraphs=True`` LangGraph yields ``(namespace_tuple, data)``
+    tuples. Without it (or for older versions) the event is a plain dict.
+    """
+    if isinstance(event, tuple) and len(event) == 2:
+        ns, data = event
+        if isinstance(ns, tuple) and isinstance(data, dict):
+            return ns, data
+    if isinstance(event, dict):
+        return (), event
+    return (), {}
+
+
+def _namespace_label(namespace: tuple) -> str:
+    """Extract a human-friendly label from a subgraph namespace tuple.
+
+    Namespace entries look like ``"node_name:<task_id>"``. We take the
+    node_name part of the last entry to show which subagent is active.
+    """
+    if not namespace:
+        return ""
+    last = str(namespace[-1])
+    return last.split(":")[0] if ":" in last else last
+
+
 class AgentRunner:
     """One request. Builds a fresh deep agent graph, streams, emits events."""
 
@@ -175,8 +202,11 @@ class AgentRunner:
         seen_ids: set[str] = set()
 
         try:
-            for chunk in self._agent.stream(inputs, config=config, stream_mode="updates"):
-                self._handle_chunk(chunk)
+            for event in self._agent.stream(
+                inputs, config=config, stream_mode="updates", subgraphs=True,
+            ):
+                namespace, chunk = _unpack_stream_event(event)
+                self._handle_chunk(chunk, namespace)
                 self._collect_messages(chunk, accumulated, seen_ids)
         except Exception as exc:
             self._emit("info", {"text": f"ERROR: {exc}"})
@@ -188,16 +218,18 @@ class AgentRunner:
 
     # ---- internals ---------------------------------------------------------
 
-    def _handle_chunk(self, chunk: dict) -> None:
+    def _handle_chunk(self, chunk: dict, namespace: tuple = ()) -> None:
         if not isinstance(chunk, dict):
             return
+        ns_label = _namespace_label(namespace)
         for node_name, update in chunk.items():
             if _is_noise_node(node_name):
                 continue
             if not isinstance(update, dict):
                 continue
+            display_name = f"{ns_label}/{node_name}" if ns_label else node_name
             for m in _unwrap_messages(update.get("messages")):
-                self._render_message(node_name, m)
+                self._render_message(display_name, m)
 
     def _collect_messages(
         self, chunk: dict, out: list, seen_ids: set[str]

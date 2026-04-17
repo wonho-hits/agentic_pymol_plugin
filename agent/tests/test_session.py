@@ -14,15 +14,24 @@ import pytest
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 from agent_server.__main__ import _cap_history
-from agent_server.session import AgentRunner, _last_ai_text
+from agent_server.session import (
+    AgentRunner,
+    _last_ai_text,
+    _namespace_label,
+    _unpack_stream_event,
+)
 
 
 class _FakeAgent:
     def __init__(self, chunks: Iterable[dict]) -> None:
         self._chunks = list(chunks)
 
-    def stream(self, inputs, config, stream_mode):  # noqa: ARG002 — signature match
-        yield from self._chunks
+    def stream(self, inputs, config, stream_mode, subgraphs=False):  # noqa: ARG002
+        for chunk in self._chunks:
+            if subgraphs:
+                yield ((), chunk)
+            else:
+                yield chunk
 
 
 def _make_runner(chunks: Iterable[dict]) -> AgentRunner:
@@ -161,3 +170,20 @@ def test_cap_history_noop_below_threshold() -> None:
 def test_cap_history_zero_means_no_cap() -> None:
     history = [{"role": "user", "content": f"q{i}"} for i in range(5)]
     assert _cap_history(history, 0) == history
+
+
+def test_unpack_stream_event_tuple() -> None:
+    ns = ("python_executor:abc123",)
+    data = {"agent": {"messages": []}}
+    assert _unpack_stream_event((ns, data)) == (ns, data)
+
+
+def test_unpack_stream_event_plain_dict() -> None:
+    data = {"agent": {"messages": []}}
+    assert _unpack_stream_event(data) == ((), data)
+
+
+def test_namespace_label_extracts_node_name() -> None:
+    assert _namespace_label(("python_executor:abc123",)) == "python_executor"
+    assert _namespace_label(("parent:1", "child:2")) == "child"
+    assert _namespace_label(()) == ""
