@@ -15,8 +15,7 @@ PyMOL> ask Show the ligand-protein interface of 2wyk as sticks
   cmd.show('sticks', 'byres polymer within 5 of lig')
   cmd.zoom('lig', 8)
 [tool·run_pymol_python] OK
-[model] Loaded 2wyk and displayed residues within 5 Å of the ligand as sticks.
-[agent] done
+[agent] ✓ Loaded 2wyk and displayed residues within 5 Å of the ligand as sticks.
 ```
 
 ---
@@ -220,12 +219,11 @@ While the agent works, the PyMOL console shows a stream like this:
 
 ```text
 [agent] ▶ <your request>
-[model] → run_pymol_python:                    ← agent calls a tool
-  cmd.fetch('1ubq', async_=0)                  ← multi-line code shown indented
+[model] → run_pymol_python:                          ← agent calls a tool
+  cmd.fetch('1ubq', async_=0)                        ← multi-line code shown indented
   cmd.show_as('cartoon', '1ubq')
-[tool·run_pymol_python] OK                     ← tool output (short = one line)
-[model] Fetched 1ubq and displayed as cartoon. ← agent reply
-[agent] done
+[tool·run_pymol_python] OK                           ← tool output (short = one line)
+[agent] ✓ Fetched 1ubq and displayed as cartoon.     ← final reply
 ```
 
 For complex tasks, the agent may delegate to a sub-agent via `task()`:
