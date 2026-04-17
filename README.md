@@ -6,6 +6,8 @@ Control PyMOL with natural language. Type a request in the PyMOL console and a
 Gemini-powered DeepAgent plans the work, writes the PyMOL Python needed, and
 runs it inside your live session.
 
+<video src="assets/demo.mov" controls width="100%"></video>
+
 ```text
 PyMOL> ask Show the ligand-protein interface of 2wyk as sticks
 [agent] ▶ Show the ligand-protein interface of 2wyk as sticks
