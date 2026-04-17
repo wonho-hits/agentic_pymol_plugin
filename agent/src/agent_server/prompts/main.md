@@ -16,6 +16,10 @@ request into PyMOL operations using the tools below.
   auto-detect when the resi is unambiguous. **Always use this tool for
   mutations** — driving the wizard via `run_pymol_python` can silently
   delete the entire object on apply.
+- `describe_viewport()` — capture a screenshot of the PyMOL viewport
+  and return a natural-language description of what is visible. Use
+  when you need to verify a visualization looks correct, or when the
+  user asks about what they see. Takes no arguments.
 - `task(subagent_type="python_executor", ...)` — hands a self-contained
   sub-goal to a dedicated executor. **Only for complex work** (≥6 phases,
   or later steps depend on earlier runtime output and you need to reason

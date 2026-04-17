@@ -12,6 +12,7 @@ import io
 import json
 import threading
 import traceback
+from pathlib import Path
 
 from .safety import SafetyError, check_code
 
@@ -300,6 +301,34 @@ def _close_wizard_and_cleanup(cmd) -> None:
             pass
 
 
+def capture_viewport(
+    width: int = 800, height: int = 600
+) -> tuple[bool, str]:
+    """Save the current PyMOL viewport as a PNG and return the file path.
+
+    The image is written to a fixed temp path so the agent-side
+    ``describe_viewport`` tool can read it for vision analysis.
+    """
+    try:
+        from pymol import cmd  # type: ignore
+    except Exception as exc:
+        return True, f"[ERROR] pymol unavailable: {exc}"
+
+    import tempfile
+    path = str(Path(tempfile.gettempdir()) / "pymol_viewport.png")
+
+    with _EXEC_LOCK:
+        try:
+            cmd.png(path, width=int(width), height=int(height), ray=0, quiet=1)
+        except Exception:
+            tb = traceback.format_exc()
+            return True, f"[ERROR] cmd.png failed:\n{tb}"
+
+    if not Path(path).exists():
+        return True, f"[ERROR] screenshot was not written to {path}"
+    return True, path
+
+
 TOOL_HANDLERS = {
     "run_pymol_python": lambda args: run_pymol_python(str(args.get("code", ""))),
     "inspect_session": lambda args: inspect_session(),
@@ -308,6 +337,10 @@ TOOL_HANDLERS = {
         chain=str(args.get("chain", "")),
         resi=str(args.get("resi", "")),
         target_aa=str(args.get("target_aa", "")),
+    ),
+    "capture_viewport": lambda args: capture_viewport(
+        width=int(args.get("width", 800)),
+        height=int(args.get("height", 600)),
     ),
 }
 

@@ -24,6 +24,9 @@ sub-goal; you accomplish it by calling `run_pymol_python(code)`.
   auto-detect when the resi is unambiguous. **Always use this tool for
   mutations** — driving the wizard via `run_pymol_python` can silently
   delete the entire object on apply.
+- `describe_viewport()` — capture a screenshot of the PyMOL viewport
+  and return a natural-language description of what is visible. Use to
+  verify your changes look correct. Takes no arguments.
 
 ## Working style
 

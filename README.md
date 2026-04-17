@@ -8,14 +8,15 @@ runs it inside your live session.
 
 ```text
 PyMOL> ask Show the ligand-protein interface of 2wyk as sticks
-[agent] ready (server v0.1.0)
 [agent] ▶ Show the ligand-protein interface of 2wyk as sticks
-[main] → task(python_executor, "fetch 2wyk and identify the ligand")
-[python_executor] → run_pymol_python(cmd.fetch('2wyk'))
-[python_executor·run_pymol_python] ExecutiveLoad-Detail: Detected mmCIF
-[python_executor] → run_pymol_python(cmd.select('lig', 'resn HEM'))
-[python_executor] → run_pymol_python(cmd.show('sticks', 'byres lig around 5'))
-[agent] ✓ Loaded 2wyk and displayed residues within 5 Å of the HEM ligand as sticks.
+[model] → run_pymol_python:
+  cmd.fetch('2wyk', async_=0)
+  cmd.select('lig', 'hetatm and not (resn HOH or solvent or inorganic)')
+  cmd.show('sticks', 'byres polymer within 5 of lig')
+  cmd.zoom('lig', 8)
+[tool·run_pymol_python] OK
+[model] Loaded 2wyk and displayed residues within 5 Å of the ligand as sticks.
+[agent] done
 ```
 
 ---
@@ -29,8 +30,9 @@ The plugin runs as **two separate Python processes**.
 │ PyMOL process (Python 3.10) │  stdin/stdout   │ Agent process (Python 3.11) │
 │                             │ ◄─────────────► │                             │
 │ • Plugin UI / commands      │  one JSON       │ • deepagents + LangChain    │
-│ • run_pymol_python runner   │  object per     │ • Gemini (google-genai)     │
-│ • AST safety checks         │  line           │ • .venv managed by uv       │
+│ • Tool handlers (exec,      │  object per     │ • Gemini (google-genai)     │
+│   mutate, screenshot, ...)  │  line           │ • Vision analysis (local)   │
+│ • AST safety checks         │                 │ • .venv managed by uv       │
 └─────────────────────────────┘                 └─────────────────────────────┘
 ```
 
@@ -218,14 +220,40 @@ While the agent works, the PyMOL console shows a stream like this:
 
 ```text
 [agent] ▶ <your request>
-[main] → task(python_executor, "<sub-goal>")           ← planner delegates
-[python_executor] → run_pymol_python(cmd.fetch...)     ← sub-agent runs code
-[python_executor·run_pymol_python] <captured stdout>   ← tool output
-[agent] ✓ <final summary>                              ← done
+[model] → run_pymol_python:                    ← agent calls a tool
+  cmd.fetch('1ubq', async_=0)                  ← multi-line code shown indented
+  cmd.show_as('cartoon', '1ubq')
+[tool·run_pymol_python] OK                     ← tool output (short = one line)
+[model] Fetched 1ubq and displayed as cartoon. ← agent reply
+[agent] done
+```
+
+For complex tasks, the agent may delegate to a sub-agent via `task()`:
+
+```text
+[model] → task(python_executor, "<sub-goal>")
 ```
 
 Stop in the middle with `ask_cancel`. Clear the conversation entirely with
 `ask_reset`.
+
+### Available tools
+
+The agent can call the following tools. Most are executed on the PyMOL side
+via the ndjson bridge; `describe_viewport` chains a remote screenshot with a
+local Gemini Vision call.
+
+| Tool | Runs on | Description |
+| ---- | ------- | ----------- |
+| `run_pymol_python(code)` | PyMOL | Execute arbitrary Python inside the live session. |
+| `inspect_session()` | PyMOL | Return a JSON snapshot of loaded objects, chains, ligand groups, and selections. |
+| `mutate_residue(obj, chain, resi, target_aa)` | PyMOL | Safely mutate a single residue via the mutagenesis wizard. |
+| `capture_viewport()` | PyMOL | Save a screenshot of the current viewport to a temp file. |
+| `describe_viewport()` | Agent (local) | Capture the viewport and return a natural-language description via Gemini Vision. |
+
+The main agent has access to all tools plus `task()` (sub-agent delegation)
+and `write_todos()`. The python executor sub-agent has all tools except
+`describe_viewport`.
 
 ---
 
@@ -240,6 +268,7 @@ Tune behaviour through `.env.local`:
 | `AGENTIC_PYMOL_MODEL`         | `gemini-3-flash-preview` | Model to use. Fall back to `gemini-2.5-flash` if the preview is rate-limited; `gemini-2.5-flash-lite` for speed/cost on trivial workloads; `gemini-2.5-pro` for harder tasks. |
 | `AGENTIC_PYMOL_RECURSION`     | `50`                | LangGraph recursion limit.                              |
 | `AGENTIC_PYMOL_TIMEOUT`       | `60`                | Per-call tool timeout in seconds.                       |
+| `AGENTIC_PYMOL_HISTORY_TURNS` | `10`                | Number of recent conversation turns kept in context. Older turns are discarded to limit token usage. |
 | `AGENTIC_PYMOL_AGENT_PYTHON`  | *(auto-detected)*   | Absolute path to the agent's Python, if you want to override the auto-resolved `agent/.venv/bin/python`. The agent project root is then derived from this path. |
 | `AGENTIC_PYMOL_AGENT_DIR`     | *(auto-derived)*    | Absolute path to the `agent/` project root. Required when the plugin was installed via the Plugin Manager (zip), since that copy does not include the `agent/` folder. |
 
@@ -313,24 +342,25 @@ ask "..."  ─►  AgentClient ─► subprocess (agent-server)
                     │                  │
                     │  ndjson request  │
                     ├─────────────────►│
-                    │                  │  deepagents planner
+                    │                  │  Main Agent (Gemini)
                     │                  │      │
-                    │                  │      ▼
-                    │                  │  task(python_executor, "...")
-                    │                  │      │
-                    │                  │      ▼
-                    │                  │  run_pymol_python(code)
-                    │◄─────────────────┤  (RPC proxy)
-                    │  tool_call       │
+                    │                  │      ├─ trivial → run_pymol_python
+                    │                  │      ├─ query   → inspect_session
+                    │                  │      ├─ mutate  → mutate_residue
+                    │                  │      ├─ vision  → describe_viewport
+                    │                  │      │             (local: capture + Gemini Vision)
+                    │                  │      └─ complex → task(python_executor)
                     │                  │
-                    │ AST check + exec │
-                    │ inside PyMOL     │
+                    │◄─────────────────┤  tool_call (remote tools)
+                    │                  │
+                    │  PyMOL handler:  │
+                    │  exec / snapshot │
+                    │  mutate / png    │
                     │                  │
                     ├─────────────────►│
                     │  tool_result     │
                     │                  │
-                    │◄─────────────────┤  final reply
-                    │  event / done    │
+                    │◄─────────────────┤  event / done
                     ▼
               PyMOL console
 ```
@@ -340,11 +370,12 @@ ask "..."  ─►  AgentClient ─► subprocess (agent-server)
 - **`__init__.py`** — PyMOL plugin entry point. Registers `ask`, `ask_status`,
   `ask_cancel`, `ask_reset`.
 - **`plugin_side/agent_client.py`** — Spawns the agent subprocess, reads ndjson
-  from its stdout on a background thread, prints events to the PyMOL console,
-  and fulfils `run_pymol_python` calls from the agent by executing them inside
-  PyMOL.
-- **`plugin_side/pymol_tools.py`** — Actually runs the generated code. Performs
-  AST safety checks before calling `exec()`.
+  from its stdout on a background thread, renders events to the PyMOL console,
+  and dispatches tool calls from the agent to the appropriate handler.
+- **`plugin_side/pymol_tools.py`** — Tool handlers that run inside PyMOL:
+  `run_pymol_python` (AST-checked `exec()`), `inspect_session` (structured
+  JSON snapshot), `mutate_residue` (safe mutagenesis wizard wrapper), and
+  `capture_viewport` (screenshot to temp file).
 - **`plugin_side/safety.py`** — Blocks dangerous imports (`os`, `subprocess`,
   `shutil`, `sys`, `socket`, `urllib`, `requests`, ...) and destructive calls
   (`cmd.reinitialize()`, `cmd.delete('all')`, `cmd.quit()`, `open(..., 'w')`,
@@ -353,12 +384,14 @@ ask "..."  ─►  AgentClient ─► subprocess (agent-server)
   `langchain-google-genai`, and `langgraph`. Nothing in here is imported by
   PyMOL.
 - **`agent/src/agent_server/__main__.py`** — The ndjson message loop.
-  Dispatches each incoming `request` to an `AgentRunner` and forwards the
-  stream of events and tool calls back to stdout.
-- **`agent/src/agent_server/remote_tool.py`** — A LangChain-compatible
-  `run_pymol_python` tool that does not execute anything itself. It emits a
-  `tool_call` message and blocks until a matching `tool_result` arrives from
-  the plugin.
+  Dispatches each incoming `request` to an `AgentRunner`, manages conversation
+  history (with configurable turn cap), and forwards events and tool calls
+  back to stdout.
+- **`agent/src/agent_server/remote_tool.py`** — LangChain tool bindings. Remote
+  tools (`run_pymol_python`, `inspect_session`, `mutate_residue`) emit a
+  `tool_call` message and block until a matching `tool_result` arrives.
+  `describe_viewport` is a local tool that chains a remote screenshot capture
+  with a Gemini Vision API call.
 
 ### Message protocol
 

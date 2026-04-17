@@ -1,20 +1,29 @@
-"""RPC proxy for ``run_pymol_python``.
+"""RPC proxy for ``run_pymol_python`` and local agent-side tools.
 
 The real PyMOL execution happens inside the plugin process. This module
-exposes a LangChain-compatible tool that, when the agent calls it,
-forwards the invocation to the plugin over ndjson and blocks until the
-plugin replies with a ``tool_result``. From the agent's perspective it
-is a synchronous, string-in/string-out tool.
+exposes LangChain-compatible tools that, when the agent calls them,
+forward the invocation to the plugin over ndjson and block until the
+plugin replies with a ``tool_result``. ``describe_viewport`` is a
+*local* tool that chains a remote screenshot capture with a Gemini
+vision call — all from the agent subprocess.
 """
 from __future__ import annotations
 
+import base64
+import logging
+import os
 import threading
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
+from langchain_core.messages import HumanMessage
 from langchain_core.tools import tool
+from langchain_google_genai import ChatGoogleGenerativeAI
+
+log = logging.getLogger(__name__)
 
 
 ToolSender = Callable[[str, str, dict], None]
@@ -131,7 +140,60 @@ class RemoteToolBridge:
                 {"obj": obj, "chain": chain, "resi": resi, "target_aa": target_aa},
             )
 
-        return [run_pymol_python, inspect_session, mutate_residue]
+        @tool
+        def describe_viewport() -> str:
+            """Capture a screenshot of the current PyMOL viewport and return
+            a natural-language description of what is visible.
+
+            The description covers: loaded objects, representation style
+            (cartoon, sticks, surface, ...), coloring scheme, highlighted
+            selections or labels, and the general camera orientation.
+
+            Use this when you need to verify that a visualization looks
+            correct, or when the user asks about what they see on screen.
+            No arguments needed — the tool captures the live viewport
+            automatically.
+            """
+            path = bridge._call("capture_viewport", {})
+            if path.startswith("["):
+                return path
+
+            try:
+                img_bytes = Path(path).read_bytes()
+            except Exception as exc:
+                return f"[ERROR] failed to read screenshot at {path}: {exc}"
+
+            b64 = base64.b64encode(img_bytes).decode("ascii")
+            model_name = os.environ.get(
+                "AGENTIC_PYMOL_MODEL", "gemini-3-flash-preview"
+            )
+            try:
+                vision_llm = ChatGoogleGenerativeAI(
+                    model=model_name, temperature=0.2,
+                )
+                msg = HumanMessage(content=[
+                    {
+                        "type": "text",
+                        "text": (
+                            "Describe this PyMOL molecular visualization in "
+                            "2-4 concise sentences. Cover: visible objects and "
+                            "their representation (cartoon, sticks, surface, etc.), "
+                            "coloring, any highlighted selections or labels, "
+                            "and camera orientation / zoom level."
+                        ),
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/png;base64,{b64}"},
+                    },
+                ])
+                response = vision_llm.invoke([msg])
+                return str(response.content)
+            except Exception as exc:
+                log.exception("vision call failed")
+                return f"[ERROR] vision model call failed: {exc}"
+
+        return [run_pymol_python, inspect_session, mutate_residue, describe_viewport]
 
     def build_tool(self) -> Any:  # pragma: no cover — kept for callers that only want the primary tool
         """Legacy alias: returns just ``run_pymol_python``."""
