@@ -51,6 +51,13 @@ _ERROR_HINTS = [
         "no if/for statements. Use selection filters instead: "
         "cmd.iterate('sele and elem FE', 'print(name)').",
     ),
+    (
+        "unexpected keyword argument",
+        "PyMOL's cmd.iterate/iterate_state/alter do not accept extra "
+        "keyword arguments like 'readonly'. Use positional args only: "
+        "cmd.iterate(sele, expr) or cmd.iterate_state(state, sele, expr). "
+        "Better yet, use get_atom_coords(sele) for coordinate access.",
+    ),
 ]
 
 
