@@ -97,8 +97,36 @@ def _build_namespace() -> dict:
             for a in cmd.get_model(sele).atom
         ]
 
+    _COORD_VARS = {"x", "y", "z", "coord", "np.array", "element"}
+    _real_iterate = cmd.iterate
+    _real_iterate_state = cmd.iterate_state
+
+    def _safe_iterate(sele, expr, *args, **kwargs):
+        if any(v in expr for v in _COORD_VARS):
+            raise RuntimeError(
+                f"iterate expression references coordinate/element variables "
+                f"({', '.join(v for v in _COORD_VARS if v in expr)}). "
+                f"Use get_atom_coords(sele) instead — it returns "
+                f"(name, elem, resi, resn, chain, x, y, z) tuples."
+            )
+        return _real_iterate(sele, expr, *args, **kwargs)
+
+    def _safe_iterate_state(state, sele, expr, *args, **kwargs):
+        if any(v in expr for v in {"np.array", "element"}):
+            raise RuntimeError(
+                f"iterate_state expression references unavailable variables. "
+                f"Use get_atom_coords(sele) instead."
+            )
+        return _real_iterate_state(state, sele, expr, *args, **kwargs)
+
+    # Wrap cmd so agent code uses safe versions transparently
+    import types
+    safe_cmd = types.SimpleNamespace(**{k: getattr(cmd, k) for k in dir(cmd) if not k.startswith('_')})
+    safe_cmd.iterate = _safe_iterate
+    safe_cmd.iterate_state = _safe_iterate_state
+
     ns: dict = {
-        "cmd": cmd,
+        "cmd": safe_cmd,
         "stored": stored,
         "math": math,
         "get_min_distance": get_min_distance,
