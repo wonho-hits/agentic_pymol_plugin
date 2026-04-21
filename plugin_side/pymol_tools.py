@@ -515,6 +515,55 @@ def capture_viewport(
     return True, path
 
 
+def save_structure(
+    selection: str, filename: str, format: str = ""
+) -> tuple[bool, str]:
+    """Save a PyMOL selection to a file in a writable directory.
+
+    The file is saved to ``~/Desktop/<filename>`` by default. If
+    ``filename`` already contains a path separator it is used as-is.
+    ``format`` is auto-detected from the extension if omitted.
+    """
+    try:
+        from pymol import cmd  # type: ignore
+    except Exception as exc:
+        return True, f"[ERROR] pymol unavailable: {exc}"
+
+    import os
+
+    selection = str(selection).strip()
+    filename = str(filename).strip()
+    if not selection:
+        return True, "[ERROR] selection is required"
+    if not filename:
+        return True, "[ERROR] filename is required (e.g. 'complex.pdb')"
+
+    if os.sep not in filename and "/" not in filename:
+        save_dir = os.path.expanduser("~/Desktop")
+        os.makedirs(save_dir, exist_ok=True)
+        filepath = os.path.join(save_dir, filename)
+    else:
+        filepath = os.path.expanduser(filename)
+
+    with _EXEC_LOCK:
+        try:
+            n = int(cmd.count_atoms(selection))
+        except Exception as exc:
+            return True, f"[ERROR] selection error: {exc}"
+        if n == 0:
+            return True, f"[ERROR] selection '{selection}' matched 0 atoms"
+
+        try:
+            if format:
+                cmd.save(filepath, selection, format=format)
+            else:
+                cmd.save(filepath, selection)
+        except Exception as exc:
+            return True, f"[ERROR] cmd.save failed: {exc}"
+
+    return True, f"[OK] saved {n} atoms to {filepath}"
+
+
 _PYMOL_BOND_ORDER = {1: 1, 2: 2, 3: 3, 12: 4}  # RDKit int -> PyMOL order
 
 
@@ -724,6 +773,11 @@ TOOL_HANDLERS = {
         target_aa=str(args.get("target_aa", "")),
     ),
     "pretty": lambda args: pretty(selection=str(args.get("selection", "all"))),
+    "save_structure": lambda args: save_structure(
+        selection=str(args.get("selection", "")),
+        filename=str(args.get("filename", "")),
+        format=str(args.get("format", "")),
+    ),
     "assign_bond_orders": lambda args: assign_bond_orders(
         selection=str(args.get("selection", "")),
         smiles=str(args.get("smiles", "")),

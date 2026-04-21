@@ -238,6 +238,30 @@ class RemoteToolBridge:
             return bridge._call("pretty", {"selection": selection})
 
         @tool
+        def save_structure(selection: str, filename: str, format: str = "") -> str:
+            """Save a PyMOL selection to a file.
+
+            Args:
+                selection: PyMOL selection to save (e.g.
+                    ``"(obj and chain A) or resn LIG"``).
+                filename: Output filename (e.g. ``"complex.pdb"``).
+                    If no path is given, saves to ``~/Desktop/``.
+                    Include a path to save elsewhere (e.g.
+                    ``"/tmp/out.pdb"``).
+                format: File format — auto-detected from extension if
+                    omitted. Common: ``"pdb"``, ``"cif"``, ``"sdf"``,
+                    ``"mol2"``.
+
+            Use this instead of ``cmd.save`` in ``run_pymol_python`` —
+            it handles writable paths automatically and returns the
+            absolute path of the saved file.
+            """
+            return bridge._call(
+                "save_structure",
+                {"selection": selection, "filename": filename, "format": format},
+            )
+
+        @tool
         def assign_bond_orders(selection: str, smiles: str) -> str:
             """Rewrite bonds in a PyMOL selection to match a reference SMILES.
 
@@ -361,8 +385,8 @@ class RemoteToolBridge:
             return _fetch_pymol_wiki(command)
 
         return [run_pymol_python, inspect_session, mutate_residue, pretty,
-                assign_bond_orders, align_to_core, describe_viewport,
-                lookup_pymol_docs]
+                save_structure, assign_bond_orders, align_to_core,
+                describe_viewport, lookup_pymol_docs]
 
     def build_tool(self) -> Any:  # pragma: no cover — kept for callers that only want the primary tool
         """Legacy alias: returns just ``run_pymol_python``."""

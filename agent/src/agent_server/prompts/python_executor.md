@@ -33,6 +33,8 @@ sub-goal; you accomplish it by calling `run_pymol_python(code)`.
   delete the entire object on apply.
 - `pretty(selection="all")` — apply the standard pastel visualization
   style. Call for any styling request or after loading a structure.
+- `save_structure(selection, filename)` — save to file (default
+  `~/Desktop/`). Use instead of `cmd.save` in `run_pymol_python`.
 - `assign_bond_orders(selection, smiles)` — fix bond orders on a PDB
   ligand from a SMILES. Call before SMARTS matching or alignment.
 - `align_to_core(probe, ref, core_smarts)` — RDKit SMARTS-based

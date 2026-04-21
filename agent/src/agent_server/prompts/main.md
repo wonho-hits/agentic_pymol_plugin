@@ -20,6 +20,10 @@ request into PyMOL operations using the tools below.
   style (cartoon + sticks, one pastel per chain, cnc, clean render
   settings, orient camera). Call for any "show nicely" / "enhance" /
   "pretty" request, or after loading a new structure.
+- `save_structure(selection, filename, format="")` — save a selection
+  to a file. Saves to `~/Desktop/` by default if no path given.
+  **Always use this instead of `cmd.save` in `run_pymol_python`** —
+  it handles writable paths and returns the absolute path.
 - `assign_bond_orders(selection, smiles)` — fix bond orders on a PDB
   ligand using a reference SMILES. PDB/CIF loads all bonds as single;
   call this before any RDKit-based work (SMARTS matching, alignment).
