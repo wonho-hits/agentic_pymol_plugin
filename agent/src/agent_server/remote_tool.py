@@ -238,6 +238,28 @@ class RemoteToolBridge:
             return bridge._call("pretty", {"selection": selection})
 
         @tool
+        def assign_bond_orders(selection: str, smiles: str) -> str:
+            """Rewrite bonds in a PyMOL selection to match a reference SMILES.
+
+            Args:
+                selection: PyMOL selection containing the ligand (e.g.
+                    ``"7VH8 and resn 4WI"``).
+                smiles: SMILES string describing the same molecule.
+                    Must have the same heavy-atom connectivity as the
+                    selection; hydrogen differences are fine.
+
+            PDB/CIF ligands are loaded with all single bonds. This tool
+            uses RDKit to assign the correct bond orders (single, double,
+            aromatic) from the SMILES template. Call this before any
+            RDKit-based analysis (SMARTS matching, alignment) on a PDB
+            ligand.
+            """
+            return bridge._call(
+                "assign_bond_orders",
+                {"selection": selection, "smiles": smiles},
+            )
+
+        @tool
         def align_to_core(probe: str, ref: str, core_smarts: str) -> str:
             """Align a probe molecule onto a reference using an RDKit
             SMARTS-based core.
@@ -339,7 +361,8 @@ class RemoteToolBridge:
             return _fetch_pymol_wiki(command)
 
         return [run_pymol_python, inspect_session, mutate_residue, pretty,
-                align_to_core, describe_viewport, lookup_pymol_docs]
+                assign_bond_orders, align_to_core, describe_viewport,
+                lookup_pymol_docs]
 
     def build_tool(self) -> Any:  # pragma: no cover — kept for callers that only want the primary tool
         """Legacy alias: returns just ``run_pymol_python``."""

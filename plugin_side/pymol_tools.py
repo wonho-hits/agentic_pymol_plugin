@@ -515,6 +515,93 @@ def capture_viewport(
     return True, path
 
 
+_PYMOL_BOND_ORDER = {1: 1, 2: 2, 3: 3, 12: 4}  # RDKit int -> PyMOL order
+
+
+def assign_bond_orders(selection: str, smiles: str) -> tuple[bool, str]:
+    """Rewrite bonds in a PyMOL selection to match a reference SMILES.
+
+    PyMOL loads PDB/CIF ligands with all single bonds. This function
+    uses RDKit's ``AssignBondOrdersFromTemplate`` to transfer the real
+    bond orders (single/double/aromatic) from a SMILES onto the 3D
+    structure, then rewrites every heavy-heavy bond in PyMOL via
+    ``cmd.unbond`` + ``cmd.bond``.
+
+    The SMILES must describe the same molecule as the selection (same
+    heavy-atom connectivity); hydrogen count differences are fine.
+    """
+    try:
+        from pymol import cmd  # type: ignore
+    except Exception as exc:
+        return True, f"[ERROR] pymol unavailable: {exc}"
+
+    try:
+        from rdkit import Chem
+        from rdkit.Chem import AllChem
+    except ImportError:
+        return True, (
+            "[ERROR] rdkit is not installed in the PyMOL Python environment."
+        )
+
+    selection = str(selection).strip()
+    smiles = str(smiles).strip()
+    if not selection:
+        return True, "[ERROR] selection is required"
+    if not smiles:
+        return True, "[ERROR] smiles is required"
+
+    with _EXEC_LOCK:
+        try:
+            pdb_block = cmd.get_pdbstr(selection)
+        except Exception as exc:
+            return True, f"[ERROR] cmd.get_pdbstr failed: {exc}"
+
+        raw = Chem.MolFromPDBBlock(pdb_block, removeHs=True, sanitize=False)
+        if raw is None:
+            return True, f"[ERROR] RDKit could not parse selection '{selection}'"
+
+        template = Chem.MolFromSmiles(smiles)
+        if template is None:
+            return True, f"[ERROR] invalid SMILES: {smiles}"
+
+        try:
+            fixed = AllChem.AssignBondOrdersFromTemplate(template, raw)
+        except Exception as exc:
+            return True, (
+                f"[ERROR] bond order assignment failed: {exc}. "
+                f"SMILES and selection must have the same heavy-atom connectivity."
+            )
+
+        model = cmd.get_model(f"({selection}) and not hydro")
+        pymol_indices = [a.index for a in model.atom]
+        if len(pymol_indices) != fixed.GetNumAtoms():
+            return True, (
+                f"[ERROR] heavy-atom count mismatch: PyMOL {len(pymol_indices)} "
+                f"vs RDKit {fixed.GetNumAtoms()}"
+            )
+
+        obj_names = cmd.get_object_list(selection)
+        if len(obj_names) != 1:
+            return True, (
+                f"[ERROR] selection must be in one object, got {obj_names}"
+            )
+        obj = obj_names[0]
+
+        n_changed = 0
+        for b in fixed.GetBonds():
+            i, j = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
+            order = _PYMOL_BOND_ORDER.get(int(b.GetBondTypeAsDouble()), 1)
+            if b.GetIsAromatic():
+                order = 4
+            a1 = f"{obj} and index {pymol_indices[i]}"
+            a2 = f"{obj} and index {pymol_indices[j]}"
+            cmd.unbond(a1, a2)
+            cmd.bond(a1, a2, order=order)
+            n_changed += 1
+
+    return True, f"[OK] rewrote {n_changed} bonds on {obj} from SMILES"
+
+
 def align_to_core(
     probe: str, ref: str, core_smarts: str
 ) -> tuple[bool, str]:
@@ -637,6 +724,10 @@ TOOL_HANDLERS = {
         target_aa=str(args.get("target_aa", "")),
     ),
     "pretty": lambda args: pretty(selection=str(args.get("selection", "all"))),
+    "assign_bond_orders": lambda args: assign_bond_orders(
+        selection=str(args.get("selection", "")),
+        smiles=str(args.get("smiles", "")),
+    ),
     "align_to_core": lambda args: align_to_core(
         probe=str(args.get("probe", "")),
         ref=str(args.get("ref", "")),

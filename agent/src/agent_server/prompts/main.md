@@ -20,6 +20,9 @@ request into PyMOL operations using the tools below.
   style (cartoon + sticks, one pastel per chain, cnc, clean render
   settings, orient camera). Call for any "show nicely" / "enhance" /
   "pretty" request, or after loading a new structure.
+- `assign_bond_orders(selection, smiles)` — fix bond orders on a PDB
+  ligand using a reference SMILES. PDB/CIF loads all bonds as single;
+  call this before any RDKit-based work (SMARTS matching, alignment).
 - `align_to_core(probe, ref, core_smarts)` — align a probe molecule
   onto a reference using an RDKit SMARTS core. Handles symmetry and
   H-count differences. The aligned probe is loaded as
