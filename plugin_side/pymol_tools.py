@@ -515,6 +515,118 @@ def capture_viewport(
     return True, path
 
 
+def align_to_core(
+    probe: str, ref: str, core_smarts: str
+) -> tuple[bool, str]:
+    """Align a probe molecule/selection onto a reference using an RDKit
+    SMARTS core.
+
+    Both ``probe`` and ``ref`` are PyMOL selections (e.g. an object name,
+    ``"obj and resn UNK"``, or a named selection). The function:
+
+    1. Exports each selection to a temporary SDF.
+    2. Reads them into RDKit.
+    3. Finds all substructure matches for the core SMARTS and picks the
+       atom mapping with the lowest RMSD (handles symmetry).
+    4. Loads the aligned probe back into PyMOL as ``<original>_aligned``.
+
+    Returns ``(True, "[OK] ...")`` with the core RMSD and the new object
+    name, or ``(True, "[ERROR] ...")`` on failure.
+    """
+    try:
+        from pymol import cmd  # type: ignore
+    except Exception as exc:
+        return True, f"[ERROR] pymol unavailable: {exc}"
+
+    try:
+        from rdkit import Chem
+        from rdkit.Chem import rdMolAlign
+    except ImportError:
+        return True, (
+            "[ERROR] rdkit is not installed in the PyMOL Python environment. "
+            "Install with: <pymol-python> -m pip install rdkit"
+        )
+
+    import os
+    import tempfile
+
+    probe = str(probe).strip()
+    ref = str(ref).strip()
+    core_smarts = str(core_smarts).strip()
+
+    if not probe or not ref:
+        return True, "[ERROR] both probe and ref selections are required"
+    if not core_smarts:
+        return True, "[ERROR] core_smarts is required"
+
+    tmp = tempfile.gettempdir()
+    probe_path = os.path.join(tmp, "_align_probe.sdf")
+    ref_path = os.path.join(tmp, "_align_ref.sdf")
+    aligned_path = os.path.join(tmp, "_align_result.sdf")
+
+    with _EXEC_LOCK:
+        try:
+            n_probe = int(cmd.count_atoms(probe))
+            n_ref = int(cmd.count_atoms(ref))
+        except Exception as exc:
+            return True, f"[ERROR] selection error: {exc}"
+        if n_probe == 0:
+            return True, f"[ERROR] probe selection '{probe}' matched 0 atoms"
+        if n_ref == 0:
+            return True, f"[ERROR] ref selection '{ref}' matched 0 atoms"
+
+        try:
+            cmd.save(probe_path, probe)
+            cmd.save(ref_path, ref)
+        except Exception as exc:
+            return True, f"[ERROR] failed to export selections: {exc}"
+
+    probe_mol = Chem.MolFromMolFile(probe_path, removeHs=False)
+    ref_mol = Chem.MolFromMolFile(ref_path, removeHs=False)
+    if probe_mol is None:
+        return True, f"[ERROR] RDKit could not parse probe from '{probe}'"
+    if ref_mol is None:
+        return True, f"[ERROR] RDKit could not parse ref from '{ref}'"
+
+    core = Chem.MolFromSmarts(core_smarts)
+    if core is None:
+        return True, f"[ERROR] invalid SMARTS: '{core_smarts}'"
+
+    p_matches = probe_mol.GetSubstructMatches(core, uniquify=False)
+    r_matches = ref_mol.GetSubstructMatches(core, uniquify=False)
+    if not p_matches:
+        return True, f"[ERROR] core SMARTS not found in probe ({n_probe} atoms)"
+    if not r_matches:
+        return True, f"[ERROR] core SMARTS not found in ref ({n_ref} atoms)"
+
+    best_rmsd, best_map = float("inf"), None
+    for pm in p_matches:
+        for rm in r_matches:
+            atom_map = list(zip(pm, rm))
+            trial = Chem.Mol(probe_mol)
+            rmsd = rdMolAlign.AlignMol(trial, ref_mol, atomMap=atom_map)
+            if rmsd < best_rmsd:
+                best_rmsd, best_map = rmsd, atom_map
+
+    rmsd = rdMolAlign.AlignMol(probe_mol, ref_mol, atomMap=best_map)
+    Chem.MolToMolFile(probe_mol, aligned_path)
+
+    probe_obj = probe.split()[0]
+    aligned_name = f"{probe_obj}_aligned"
+
+    with _EXEC_LOCK:
+        try:
+            cmd.load(aligned_path, aligned_name)
+        except Exception as exc:
+            return True, f"[ERROR] failed to load aligned result: {exc}"
+
+    return True, (
+        f"[OK] aligned '{probe}' → '{ref}' on core '{core_smarts}'\n"
+        f"core RMSD = {rmsd:.3f} Å, result object: {aligned_name}\n"
+        f"atom map (probe→ref): {best_map}"
+    )
+
+
 TOOL_HANDLERS = {
     "run_pymol_python": lambda args: run_pymol_python(str(args.get("code", ""))),
     "inspect_session": lambda args: inspect_session(),
@@ -525,6 +637,11 @@ TOOL_HANDLERS = {
         target_aa=str(args.get("target_aa", "")),
     ),
     "pretty": lambda args: pretty(selection=str(args.get("selection", "all"))),
+    "align_to_core": lambda args: align_to_core(
+        probe=str(args.get("probe", "")),
+        ref=str(args.get("ref", "")),
+        core_smarts=str(args.get("core_smarts", "")),
+    ),
     "capture_viewport": lambda args: capture_viewport(
         width=int(args.get("width", 800)),
         height=int(args.get("height", 600)),

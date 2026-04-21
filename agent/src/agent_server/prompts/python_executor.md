@@ -33,6 +33,8 @@ sub-goal; you accomplish it by calling `run_pymol_python(code)`.
   delete the entire object on apply.
 - `pretty(selection="all")` — apply the standard pastel visualization
   style. Call for any styling request or after loading a structure.
+- `align_to_core(probe, ref, core_smarts)` — RDKit SMARTS-based
+  molecular alignment. Result loaded as `<probe>_aligned`.
 - `describe_viewport()` — capture a screenshot of the PyMOL viewport
   and return a natural-language description of what is visible. Use to
   verify your changes look correct. Takes no arguments.

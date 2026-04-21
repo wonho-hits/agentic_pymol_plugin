@@ -20,6 +20,10 @@ request into PyMOL operations using the tools below.
   style (cartoon + sticks, one pastel per chain, cnc, clean render
   settings, orient camera). Call for any "show nicely" / "enhance" /
   "pretty" request, or after loading a new structure.
+- `align_to_core(probe, ref, core_smarts)` — align a probe molecule
+  onto a reference using an RDKit SMARTS core. Handles symmetry and
+  H-count differences. The aligned probe is loaded as
+  `<probe>_aligned`. Use for ligand superposition.
 - `describe_viewport()` — capture a screenshot of the PyMOL viewport
   and return a natural-language description of what is visible. Use
   when you need to verify a visualization looks correct, or when the

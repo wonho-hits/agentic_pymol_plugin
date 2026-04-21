@@ -238,6 +238,30 @@ class RemoteToolBridge:
             return bridge._call("pretty", {"selection": selection})
 
         @tool
+        def align_to_core(probe: str, ref: str, core_smarts: str) -> str:
+            """Align a probe molecule onto a reference using an RDKit
+            SMARTS-based core.
+
+            Args:
+                probe: PyMOL selection for the molecule to move (e.g.
+                    ``"obj1 and resn UNK"``).
+                ref: PyMOL selection for the fixed reference (e.g.
+                    ``"obj2 and resn UNK"``).
+                core_smarts: SMARTS pattern for the common substructure
+                    to align on (e.g. ``"c1ccc2[nH]ccc2c1"`` for an
+                    indole core).
+
+            The tool exports the selections to SDF, aligns them in RDKit
+            (trying all symmetric matches to minimise RMSD), and loads
+            the aligned probe back into PyMOL as ``<probe>_aligned``.
+            Returns the core RMSD and atom mapping on success.
+            """
+            return bridge._call(
+                "align_to_core",
+                {"probe": probe, "ref": ref, "core_smarts": core_smarts},
+            )
+
+        @tool
         def describe_viewport() -> str:
             """Capture a screenshot of the current PyMOL viewport and return
             a natural-language description of what is visible.
@@ -315,7 +339,7 @@ class RemoteToolBridge:
             return _fetch_pymol_wiki(command)
 
         return [run_pymol_python, inspect_session, mutate_residue, pretty,
-                describe_viewport, lookup_pymol_docs]
+                align_to_core, describe_viewport, lookup_pymol_docs]
 
     def build_tool(self) -> Any:  # pragma: no cover — kept for callers that only want the primary tool
         """Legacy alias: returns just ``run_pymol_python``."""
